@@ -28,6 +28,7 @@ class Control_tower extends MY_Controller {
         return array(
             'kpi'         => $this->_get_kpi_metrics(),
             'queues'      => $this->_get_active_queues(),
+            'stage_kpi'   => $this->_get_stage_kpi(),
             'sos_reports' => $this->_get_sos_reports(),
             'heatmap'     => $this->_get_yard_density()
         );
@@ -47,7 +48,7 @@ class Control_tower extends MY_Controller {
                                   ->count_all_results('queue_transactions');
 
         // Truk di dalam depo (sudah Gate In, belum Gate Out)
-        $truck_in_yard = $this->db->where_in('status', array('IN_YARD', 'AT_YARD'))
+        $truck_in_yard = $this->db->where_in('status', $this->in_depo_statuses)
                                   ->count_all_results('queue_transactions');
 
         // Rata-rata TAT (Menit) truk yang Gate Out hari ini:
@@ -61,10 +62,6 @@ class Control_tower extends MY_Controller {
             WHERE status = 'COMPLETED' AND gate_out_at >= ?
         ", array(date('Y-m-d 00:00:00')))->row();
 
-        // Antrean per tahap yang belum di-scan
-        $pending_yard     = $this->db->where('status', 'IN_YARD')->count_all_results('queue_transactions');
-        $pending_gate_out = $this->db->where('status', 'AT_YARD')->count_all_results('queue_transactions');
-
         // Throughput Gate In 1 jam terakhir
         $gate_in_last_hour = $this->db->where('gate_in_at >=', date('Y-m-d H:i:s', time() - 3600))
                                       ->count_all_results('queue_transactions');
@@ -77,8 +74,6 @@ class Control_tower extends MY_Controller {
             'truck_waiting'     => $truck_waiting,
             'truck_expired'     => $truck_expired,
             'truck_in_yard'     => $truck_in_yard,
-            'pending_yard'      => $pending_yard,
-            'pending_gate_out'  => $pending_gate_out,
             'gate_in_last_hour' => $gate_in_last_hour
         );
     }
@@ -86,7 +81,7 @@ class Control_tower extends MY_Controller {
     private function _get_active_queues() {
         $now  = $this->_now();
         $rows = $this->db->query("
-            SELECT q.id, q.queue_number, q.license_plate, q.status, q.sla_target_minutes, z.zone_code,
+            SELECT q.id, q.queue_number, q.license_plate, q.container_no, q.status, q.sla_target_minutes, z.zone_code, z.depo,
             CASE WHEN q.status = 'WAITING_GATE'
                  THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
                  ELSE TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
@@ -94,20 +89,19 @@ class Control_tower extends MY_Controller {
             CASE q.status
                  WHEN 'WAITING_GATE' THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
                  WHEN 'IN_YARD'      THEN TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
+                 WHEN 'IN_SURVEY'    THEN TIMESTAMPDIFF(MINUTE, q.survey_start_at, ?)
                  ELSE TIMESTAMPDIFF(MINUTE, q.yard_scan_at, ?)
             END AS stage_minutes
             FROM queue_transactions q
             LEFT JOIN yard_zones z ON z.id = q.current_zone_id
-            WHERE q.status IN ('IN_YARD', 'AT_YARD')
+            WHERE q.status IN ('IN_YARD', 'IN_SURVEY', 'AT_YARD')
                OR (q.status = 'WAITING_GATE' AND q.created_at >= ?)
             ORDER BY q.id ASC
-        ", array($now, $now, $now, $now, $now, $this->_expiry_cutoff()))->result();
+        ", array($now, $now, $now, $now, $now, $now, $this->_expiry_cutoff()))->result();
 
         $rate     = $this->_minutes_per_gate_in();
         $position = 0;
         $queues   = array();
-
-        $stages = array('WAITING_GATE' => 'gate_in', 'IN_YARD' => 'yard', 'AT_YARD' => 'gate_out');
 
         foreach ($rows as $q) {
             $elapsed       = max(0, (int) $q->elapsed_minutes);
@@ -123,10 +117,13 @@ class Control_tower extends MY_Controller {
                     $estimated_call = (int) round(($position - 1) * $rate);
                 }
             } elseif ($q->status === 'IN_YARD') {
-                $label = 'Menunggu Yardman';
+                $label = 'Gate In - Menuju Survey';
+                $badge = 'badge-yard';
+            } elseif ($q->status === 'IN_SURVEY') {
+                $label = 'Sedang Survey';
                 $badge = 'badge-yard';
             } else {
-                $label = 'Menunggu Gate Out' . ($q->zone_code ? ' (Blok ' . $q->zone_code . ')' : '');
+                $label = 'Menunggu Gate Out' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
                 $badge = 'badge-yard';
             }
 
@@ -138,18 +135,50 @@ class Control_tower extends MY_Controller {
             $queues[] = array(
                 'queue_number'    => $q->queue_number,
                 'license_plate'   => $q->license_plate,
+                'container_no'    => $q->container_no,
                 'status_label'    => $label,
                 'badge_class'     => $badge,
                 'elapsed_minutes' => $elapsed,
                 'estimated_call'  => $estimated_call,
                 // Tahap yang sedang ditunggu & lama menunggu di tahap itu (KPI per tahap di dalam depo)
-                'stage'           => $stages[$q->status],
+                'stage'           => isset($this->stages[$q->status]) ? $this->stages[$q->status][0] : 'antre',
                 'stage_minutes'   => $stage_minutes,
                 'stage_overdue'   => $q->status !== 'WAITING_GATE' && $stage_minutes > self::STAGE_KPI_MINUTES
             );
         }
 
         return $queues;
+    }
+
+    // KPI per tahap untuk truk yang Gate Out hari ini: rata-rata menit & jumlah yang mencapai target
+    private function _get_stage_kpi() {
+        $target = self::STAGE_KPI_MINUTES * 60;
+        $row = $this->db->query("
+            SELECT COUNT(*) AS total,
+                   AVG(TIMESTAMPDIFF(SECOND, gate_in_at, survey_start_at))   AS avg_gate_in,
+                   AVG(TIMESTAMPDIFF(SECOND, survey_start_at, yard_scan_at)) AS avg_survey,
+                   AVG(TIMESTAMPDIFF(SECOND, yard_scan_at, gate_out_at))     AS avg_gate_out,
+                   SUM(TIMESTAMPDIFF(SECOND, gate_in_at, survey_start_at) <= ?)   AS ok_gate_in,
+                   SUM(TIMESTAMPDIFF(SECOND, survey_start_at, yard_scan_at) <= ?) AS ok_survey,
+                   SUM(TIMESTAMPDIFF(SECOND, yard_scan_at, gate_out_at) <= ?)     AS ok_gate_out
+            FROM queue_transactions
+            WHERE status = 'COMPLETED' AND gate_out_at >= ? AND survey_start_at IS NOT NULL
+        ", array($target, $target, $target, date('Y-m-d 00:00:00')))->row();
+
+        $total  = (int) $row->total;
+        $result = array();
+        foreach (array('gate_in' => 'Gate In', 'survey' => 'At Yard (Survey)', 'gate_out' => 'Gate Out') as $key => $label) {
+            $ok = (int) $row->{'ok_' . $key};
+            $result[] = array(
+                'stage'       => $key,
+                'label'       => $label,
+                'avg_minutes' => $total ? round((float) $row->{'avg_' . $key} / 60, 1) : NULL,
+                'achieved'    => $ok,
+                'total'       => $total,
+                'percent'     => $total ? (int) round($ok / $total * 100) : NULL
+            );
+        }
+        return $result;
     }
 
     // Tandai laporan SOS sudah ditindaklanjuti
@@ -173,11 +202,11 @@ class Control_tower extends MY_Controller {
     private function _get_yard_density() {
         // Jumlah truk yang sedang dilayani (AT_YARD) per blok dibanding kapasitas blok
         $rows = $this->db->query("
-            SELECT z.zone_code, z.capacity, COUNT(q.id) AS total
+            SELECT z.zone_code, z.depo, z.capacity, COUNT(q.id) AS total
             FROM yard_zones z
             LEFT JOIN queue_transactions q ON q.current_zone_id = z.id AND q.status = 'AT_YARD'
-            GROUP BY z.id, z.zone_code, z.capacity
-            ORDER BY z.zone_code ASC
+            GROUP BY z.id, z.zone_code, z.depo, z.capacity
+            ORDER BY z.depo ASC, z.zone_code ASC
         ")->result();
 
         $grid = array();
@@ -190,7 +219,7 @@ class Control_tower extends MY_Controller {
             if ($percent >= 80) $level = 'high';
             elseif ($percent >= 50) $level = 'medium';
 
-            $grid[$row->zone_code] = array('count' => $count, 'capacity' => (int) $row->capacity, 'level' => $level);
+            $grid[$row->zone_code] = array('depo' => $row->depo, 'count' => $count, 'capacity' => (int) $row->capacity, 'level' => $level);
         }
         return $grid;
     }

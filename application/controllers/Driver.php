@@ -29,7 +29,9 @@ class Driver extends MY_Controller {
         $data['queue']                 = $queue;
         $data['queue_position']        = $queue->status === 'WAITING_GATE' ? $this->_queue_position($queue) : NULL;
         $data['estimated_wait']        = $this->_estimated_wait($data['queue_position']);
-        $data['sla_remaining_seconds'] = $this->_sla_remaining_seconds($queue);
+        $data['timer']                 = $this->_timer_info($queue);
+        // Barcode baru muncul setelah Gate In (berisi data kitir)
+        $data['qr_payload']            = empty($queue->gate_in_at) ? NULL : $this->_qr_payload($queue);
 
         $this->load->view('driver/dashboard_view', $data);
     }
@@ -98,33 +100,41 @@ class Driver extends MY_Controller {
         $phone = $this->session->userdata('driver_phone');
         $plate = $this->session->userdata('license_plate');
 
-        $this->db->where('driver_phone', $phone);
-        $this->db->where('license_plate', $plate);
-        $this->db->order_by('id', 'DESC');
-        $queue = $this->db->get('queue_transactions')->row();
+        $this->db->select('q.*, z.zone_code, z.depo');
+        $this->db->from('queue_transactions q');
+        $this->db->join('yard_zones z', 'z.id = q.current_zone_id', 'left');
+        $this->db->where('q.driver_phone', $phone);
+        $this->db->where('q.license_plate', $plate);
+        $this->db->order_by('q.id', 'DESC');
+        $this->db->limit(1);
+        $queue = $this->db->get()->row();
 
         if ($queue) {
             $position = $queue->status === 'WAITING_GATE' ? $this->_queue_position($queue) : NULL;
             $this->_json(array(
-                'status'                => 'success',
-                'queue_status'          => $this->_is_expired($queue) ? 'EXPIRED' : $queue->status,
-                'queue_position'        => $position,
-                'estimated_wait'        => $this->_estimated_wait($position),
-                'sla_remaining_seconds' => $this->_sla_remaining_seconds($queue),
-                'sla_target_minutes'    => $queue->sla_target_minutes
+                'status'          => 'success',
+                'queue_status'    => $this->_is_expired($queue) ? 'EXPIRED' : $queue->status,
+                'queue_position'  => $position,
+                'estimated_wait'  => $this->_estimated_wait($position),
+                'timer'           => $this->_timer_info($queue),
+                'stage_durations' => $queue->status === 'COMPLETED' ? $this->_stage_durations($queue) : array()
             ));
         } else {
             $this->_json(array('status' => 'not_found'));
         }
     }
 
-    // Antrean aktif supir (WAITING_GATE yang belum kedaluwarsa, IN_YARD, atau AT_YARD)
+    // Antrean aktif supir (WAITING_GATE yang belum kedaluwarsa, atau sedang di dalam depo)
     private function _get_active_queue() {
-        $this->db->where('driver_phone', $this->session->userdata('driver_phone'));
-        $this->db->where('license_plate', $this->session->userdata('license_plate'));
-        $this->db->where_in('status', array('WAITING_GATE', 'IN_YARD', 'AT_YARD'));
-        $this->db->order_by('id', 'DESC');
-        $queue = $this->db->get('queue_transactions')->row();
+        $this->db->select('q.*, z.zone_code, z.depo');
+        $this->db->from('queue_transactions q');
+        $this->db->join('yard_zones z', 'z.id = q.current_zone_id', 'left');
+        $this->db->where('q.driver_phone', $this->session->userdata('driver_phone'));
+        $this->db->where('q.license_plate', $this->session->userdata('license_plate'));
+        $this->db->where_in('q.status', array_merge(array('WAITING_GATE'), $this->in_depo_statuses));
+        $this->db->order_by('q.id', 'DESC');
+        $this->db->limit(1);
+        $queue = $this->db->get()->row();
 
         return ($queue && !$this->_is_expired($queue)) ? $queue : NULL;
     }

@@ -102,40 +102,56 @@
             </div>
         </div>
 
+        <!-- KPI per Tahap hari ini: proses mana yang tidak mencapai target -->
+        <h6 class="fw-bold text-muted mb-3">KPI PER TAHAP HARI INI <small class="fw-normal">(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, truk yang sudah Gate Out)</small></h6>
+        <div class="row g-3 mb-4" id="stageKpiCards"></div>
+
         <!-- Pending per Tahap: klik untuk menyaring tabel Live Antrean -->
         <h6 class="fw-bold text-muted mb-3">PENDING PER TAHAP <small class="fw-normal">(klik untuk melihat detail)</small></h6>
         <div class="row g-3 mb-4" id="stageCards">
-            <div class="col-md-4">
+            <div class="col-md-6 col-xl-3">
+                <div class="stage-card" data-stage="antre" role="button" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-1">Antre Gate In</small>
+                            <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
+                            <small class="stage-overdue text-muted">Antre di luar depo</small>
+                        </div>
+                        <div class="icon-kpi-wrapper" style="background-color: #e2e8f0; color: #475569;"><i class="fas fa-truck fa-lg"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl-3">
                 <div class="stage-card" data-stage="gate_in" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <small class="text-muted d-block mb-1">Pending Gate In</small>
+                            <small class="text-muted d-block mb-1">Tahap Gate In</small>
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
-                            <small class="stage-overdue text-muted">Antre di luar depo</small>
+                            <small class="stage-overdue text-muted">Gate In &rarr; masuk survey</small>
                         </div>
                         <div class="icon-kpi-wrapper" style="background-color: #dbeafe; color: #2563eb;"><i class="fas fa-sign-in-alt fa-lg"></i></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="stage-card" data-stage="yard" role="button" tabindex="0">
+            <div class="col-md-6 col-xl-3">
+                <div class="stage-card" data-stage="survey" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <small class="text-muted d-block mb-1">Pending Yardman</small>
+                            <small class="text-muted d-block mb-1">Tahap Survey (At Yard)</small>
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
-                            <small class="stage-overdue text-muted">Target &le; <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit</small>
+                            <small class="stage-overdue text-muted">Masuk &rarr; selesai survey</small>
                         </div>
-                        <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;"><i class="fas fa-hard-hat fa-lg"></i></div>
+                        <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;"><i class="fas fa-search fa-lg"></i></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6 col-xl-3">
                 <div class="stage-card" data-stage="gate_out" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <small class="text-muted d-block mb-1">Pending Gate Out</small>
+                            <small class="text-muted d-block mb-1">Tahap Gate Out</small>
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
-                            <small class="stage-overdue text-muted">Target &le; <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit</small>
+                            <small class="stage-overdue text-muted">Selesai survey &rarr; Gate Out</small>
                         </div>
                         <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #16a34a;"><i class="fas fa-sign-out-alt fa-lg"></i></div>
                     </div>
@@ -158,6 +174,7 @@
                                 <tr>
                                     <th>Queue No.</th>
                                     <th>License Plate</th>
+                                    <th>Container</th>
                                     <th>Status</th>
                                     <th>Di Tahap Ini</th>
                                     <th>Elapsed Time</th>
@@ -175,13 +192,7 @@
             <div class="col-lg-4">
                 <div class="card-section">
                     <h5 class="fw-bold mb-4" style="color: #0f172a;">Kepadatan Yard</h5>
-                    <div class="grid-density mb-3" id="heatmapGrid">
-                        <?php foreach($heatmap as $code => $info): ?>
-                            <div class="density-box density-<?= $info['level']; ?>" title="<?= $info['count']; ?>/<?= $info['capacity']; ?> truk">
-                                <?= $code; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
+                    <div id="heatmapGrid"></div>
                     <?php if (empty($heatmap)): ?>
                         <small class="text-muted d-block">Belum ada data blok yard (tabel yard_zones kosong).</small>
                     <?php endif; ?>
@@ -297,7 +308,7 @@
         }
 
         const STAGE_KPI = <?= MY_Controller::STAGE_KPI_MINUTES; ?>;
-        const STAGE_TITLES = { gate_in: 'Pending Gate In', yard: 'Pending Yardman', gate_out: 'Pending Gate Out' };
+        const STAGE_TITLES = { antre: 'Antre Gate In', gate_in: 'Tahap Gate In', survey: 'Tahap Survey', gate_out: 'Tahap Gate Out' };
         let activeStage = null;
         let lastQueues = [];
 
@@ -308,7 +319,7 @@
                 let card = $('.stage-card[data-stage="' + stage + '"]');
                 card.find('.stage-count').text(rows.length);
                 card.toggleClass('has-overdue', late > 0);
-                if (stage !== 'gate_in') {
+                if (stage !== 'antre') {
                     card.find('.stage-overdue')
                         .toggleClass('stage-late', late > 0)
                         .text(late > 0 ? late + ' truk lewat ' + STAGE_KPI + ' menit!' : 'Semua dalam target \u2264 ' + STAGE_KPI + ' menit');
@@ -331,6 +342,7 @@
                 html += '<tr>' +
                     '<td class="fw-bold">' + esc(q.queue_number) + '</td>' +
                     '<td class="fw-semibold">' + esc(q.license_plate) + '</td>' +
+                    '<td>' + esc(q.container_no || '-') + '</td>' +
                     '<td><span class="badge badge-pill-status ' + esc(q.badge_class) + '">' + esc(q.status_label) + '</span></td>' +
                     '<td><span class="badge ' + (q.stage_overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(q.stage_minutes) + ' mnt</span></td>' +
                     '<td>' + esc(q.elapsed_minutes) + ' Menit</td>' +
@@ -338,7 +350,7 @@
                 '</tr>';
             });
             if (!rows.length) {
-                html = '<tr><td colspan="6" class="text-center text-muted py-4">' + (activeStage ? 'Tidak ada antrean pending di tahap ini.' : 'Tidak ada antrean aktif.') + '</td></tr>';
+                html = '<tr><td colspan="7" class="text-center text-muted py-4">' + (activeStage ? 'Tidak ada antrean pending di tahap ini.' : 'Tidak ada antrean aktif.') + '</td></tr>';
             }
             $('#queueTableBody').html(html);
         }
@@ -361,13 +373,35 @@
 
         renderQueues(<?= json_encode($queues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 
+        // Heatmap dikelompokkan per depo
         function renderHeatmap(heatmap) {
-            let html = '';
+            let groups = {};
             $.each(heatmap, function(code, info) {
-                html += '<div class="density-box density-' + esc(info.level) + '" title="' + esc(info.count) + '/' + esc(info.capacity) + ' truk">' + esc(code) + '</div>';
+                (groups[info.depo] = groups[info.depo] || []).push('<div class="density-box density-' + esc(info.level) + '" title="' + esc(info.count) + '/' + esc(info.capacity) + ' truk">' + esc(code) + (info.count ? ' (' + esc(info.count) + ')' : '') + '</div>');
+            });
+            let html = '';
+            $.each(groups, function(depo, boxes) {
+                html += '<small class="fw-bold text-muted d-block mb-1">' + esc(depo) + '</small><div class="grid-density mb-3">' + boxes.join('') + '</div>';
             });
             $('#heatmapGrid').html(html);
         }
+        renderHeatmap(<?= json_encode($heatmap, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
+
+        function renderStageKpi(stages) {
+            let html = '';
+            stages.forEach(function(k) {
+                let has = k.total > 0;
+                let good = has && k.percent >= 80;
+                let color = !has ? 'text-muted' : (good ? 'text-success' : 'text-danger');
+                html += '<div class="col-md-4"><div class="card-kpi' + (has && !good ? ' border-start border-4 border-danger' : '') + '">' +
+                    '<small class="text-muted d-block mb-1">' + esc(k.label) + '</small>' +
+                    '<h3 class="fw-bold mb-0 ' + color + '">' + (has ? esc(k.percent) + '%' : '-') + ' <small class="fs-6 text-muted">capai target</small></h3>' +
+                    '<small class="text-muted">' + (has ? 'Rata-rata ' + esc(k.avg_minutes) + ' mnt &middot; ' + esc(k.achieved) + '/' + esc(k.total) + ' truk' : 'Belum ada truk selesai hari ini') + '</small>' +
+                '</div></div>';
+            });
+            $('#stageKpiCards').html(html);
+        }
+        renderStageKpi(<?= json_encode($stage_kpi, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 
         // Pop up SOS: tampilkan laporan yang id-nya lebih baru dari yang sudah pernah terlihat
         let lastSosId = <?php $max_sos = 0; foreach ($sos_reports as $sos) { $max_sos = max($max_sos, (int) $sos->id); } echo $max_sos; ?>;
@@ -480,6 +514,7 @@
                     $('#kpiGateIn').text(data.kpi.gate_in_last_hour);
                     renderQueues(data.queues);
                     renderHeatmap(data.heatmap);
+                    renderStageKpi(data.stage_kpi);
                     renderSos(data.sos_reports);
                     showSosAlert(data.sos_reports);
                 },

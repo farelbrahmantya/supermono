@@ -56,15 +56,29 @@
             <!-- Alert Notifikasi Toast -->
             <div id="scanResult" style="display:none;" class="alert border-0 shadow-sm mb-3"></div>
 
-            <!-- Pilih Blok Yard (disimpan untuk heatmap kepadatan) -->
+            <!-- Alur scan Yardman -->
+            <div class="card-custom p-3 mb-3 small">
+                <div class="fw-bold text-secondary mb-1"><i class="fas fa-info-circle me-1"></i> ALUR SCAN YARDMAN</div>
+                <div><span class="badge bg-primary me-1">Scan 1</span> Truk masuk area survey</div>
+                <div class="mt-1"><span class="badge bg-success me-1">Scan 2</span> Survey selesai &rarr; pilih Depo &amp; Blok dulu, lalu scan</div>
+            </div>
+
+            <!-- Pilih Depo & Blok (wajib saat scan 2 / survey selesai) -->
             <?php if (!empty($zones)): ?>
             <div class="card-custom p-3 mb-3">
-                <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-th me-1"></i> BLOK YARD PENEMPATAN</span>
+                <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-th me-1"></i> DEPO &amp; BLOK PENEMPATAN <span class="fw-normal">(untuk scan 2)</span></span>
                 <select id="zoneSelect" class="form-select fw-bold">
-                    <option value="">-- Pilih Blok Yard --</option>
+                    <option value="">-- Pilih Depo &amp; Blok --</option>
+                    <?php $current_depo = NULL; ?>
                     <?php foreach ($zones as $zone): ?>
-                        <option value="<?= html_escape($zone->zone_code); ?>"><?= html_escape($zone->zone_code); ?></option>
+                        <?php if ($zone->depo !== $current_depo): ?>
+                            <?php if ($current_depo !== NULL): ?></optgroup><?php endif; ?>
+                            <optgroup label="<?= html_escape($zone->depo); ?>">
+                            <?php $current_depo = $zone->depo; ?>
+                        <?php endif; ?>
+                        <option value="<?= html_escape($zone->zone_code); ?>"><?= html_escape($zone->depo . ' - Blok ' . $zone->zone_code); ?></option>
                     <?php endforeach; ?>
+                    <?php if ($current_depo !== NULL): ?></optgroup><?php endif; ?>
                 </select>
             </div>
             <?php endif; ?>
@@ -101,10 +115,15 @@
             <!-- Card Antrean Pending: sudah Gate In, belum diverifikasi Yardman -->
             <div class="card-custom p-3 mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold text-secondary small"><i class="fas fa-hourglass-half me-1"></i> PENDING YARDMAN (BELUM DI-SCAN)</span>
-                    <span class="badge bg-warning-subtle text-dark" id="pendingYardCount">0 Truk</span>
+                    <span class="fw-bold text-secondary small"><i class="fas fa-hourglass-half me-1"></i> MENUNGGU MASUK SURVEY</span>
+                    <span class="badge bg-warning-subtle text-dark" id="pendingWaitingCount">0 Truk</span>
                 </div>
-                <div id="pendingYardList"></div>
+                <div id="pendingWaitingList" class="mb-3"></div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold text-secondary small"><i class="fas fa-search me-1"></i> SEDANG SURVEY (BELUM SCAN 2)</span>
+                    <span class="badge bg-primary-subtle text-primary" id="pendingSurveyCount">0 Truk</span>
+                </div>
+                <div id="pendingSurveyList"></div>
             </div>
 
             <!-- Card Riwayat Pindai Terakhir -->
@@ -132,27 +151,31 @@
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
         }
 
+        function renderPendingList(rows, listId, countId) {
+            $(countId).text(rows.length + ' Truk');
+            if (!rows.length) {
+                $(listId).html('<div class="text-center py-2 text-muted small">Tidak ada antrean.</div>');
+                return;
+            }
+            let html = '';
+            rows.forEach(function(r) {
+                html += '<div class="recent-item">' +
+                    '<div><div class="fw-bold text-dark mb-0">' + esc(r.container_no || r.queue_number) + '</div>' +
+                    '<small class="text-muted" style="font-size: 11px;">' + esc(r.license_plate) + ' &middot; #' + esc(r.queue_number) + '</small></div>' +
+                    '<span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span>' +
+                '</div>';
+            });
+            $(listId).html(html);
+        }
+
         function loadPending() {
             $.ajax({
                 url: "<?= base_url('yardman/pending_json'); ?>",
                 data: { _: Date.now() },
                 dataType: "json",
                 success: function(res) {
-                    let rows = res.yard || [];
-                    $('#pendingYardCount').text(rows.length + ' Truk');
-                    if (!rows.length) {
-                        $('#pendingYardList').html('<div class="text-center py-2 text-muted small">Tidak ada antrean pending.</div>');
-                        return;
-                    }
-                    let html = '';
-                    rows.forEach(function(r) {
-                        html += '<div class="recent-item">' +
-                            '<div><div class="fw-bold text-dark mb-0">' + esc(r.queue_number) + '</div>' +
-                            '<small class="text-muted" style="font-size: 11px;">' + esc(r.license_plate) + '</small></div>' +
-                            '<span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span>' +
-                        '</div>';
-                    });
-                    $('#pendingYardList').html(html);
+                    renderPendingList(res.waiting_survey || [], '#pendingWaitingList', '#pendingWaitingCount');
+                    renderPendingList(res.in_survey || [], '#pendingSurveyList', '#pendingSurveyCount');
                 }
             });
         }
@@ -218,8 +241,11 @@
                         .fadeIn();
 
                     if (res.status === 'success') {
-                        addRecentScan(queueNumber, res.message);
+                        let match = queueNumber.match(/A-\d{8}-\d{3}/);
+                        addRecentScan(match ? match[0] : queueNumber, res.message);
                         loadPending();
+                        // Blok sudah dipakai untuk survey selesai: reset agar tidak terbawa ke truk berikutnya
+                        if (/SURVEY SELESAI/.test(res.message)) $('#zoneSelect').val('');
                     }
 
                     // Error (misal blok yard belum dipilih) boleh langsung discan ulang

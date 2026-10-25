@@ -13,19 +13,24 @@ class Yardman extends MY_Controller {
     }
 
     public function index() {
-        $data['zones'] = $this->db->order_by('zone_code', 'ASC')->get('yard_zones')->result();
+        $data['zones'] = $this->db->order_by('depo', 'ASC')->order_by('zone_code', 'ASC')->get('yard_zones')->result();
         $this->load->view('yardman/scanner_view', $data);
     }
 
-    // Daftar truk yang sudah Gate In tapi belum diverifikasi Yardman
+    // Truk yang menunggu masuk survey (sudah Gate In) dan yang sedang survey
     public function pending_json() {
-        $this->_json(array('yard' => $this->_pending_queues('IN_YARD')));
+        $this->_json(array(
+            'waiting_survey' => $this->_pending_queues('IN_YARD'),
+            'in_survey'      => $this->_pending_queues('IN_SURVEY')
+        ));
     }
 
-    // API Pemrosesan Scan Barcode Yardman (IN_YARD -> AT_YARD) + Anti Double Scan
+    // Scan QR supir oleh Yardman (2x):
+    //   scan 1: IN_YARD   -> IN_SURVEY (truk masuk area survey)
+    //   scan 2: IN_SURVEY -> AT_YARD   (survey selesai, blok penempatan wajib dipilih)
     // Gate In & Gate Out hanya boleh dilakukan Security di halaman Gate.
     public function process_scan() {
-        $queue_number = strtoupper(trim((string) $this->input->post('queue_number')));
+        $queue_number = $this->_extract_queue_number($this->input->post('queue_number'));
         $zone_code    = strtoupper(trim((string) $this->input->post('zone_code')));
         $user_id      = $this->session->userdata('user_id');
 
@@ -44,15 +49,28 @@ class Yardman extends MY_Controller {
             return;
         }
 
+        // SCAN 1: truk masuk area survey
+        if ($queue->status == 'IN_YARD') {
+            $updated = $this->_transition($queue->id, 'IN_YARD', array(
+                'status'          => 'IN_SURVEY',
+                'survey_start_at' => $this->_now(),
+                'survey_start_by' => $user_id
+            ));
+            $this->_json($updated
+                ? array('status' => 'success', 'message' => "MASUK AREA SURVEY!\nContainer {$queue->container_no} ({$queue->license_plate}).\nScan lagi setelah survey selesai.")
+                : array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
+            return;
+        }
+
         if ($queue->status == 'AT_YARD') {
             $this->_json(array(
                 'status'  => 'warning',
-                'message' => "Antrean {$queue->queue_number} sudah diverifikasi Yardman pada {$queue->yard_scan_at}.\nSelanjutnya scan di Gate Out."
+                'message' => "Survey antrean {$queue->queue_number} sudah selesai pada {$queue->yard_scan_at}.\nSelanjutnya scan di Gate Out."
             ));
             return;
         }
 
-        if ($queue->status != 'IN_YARD') {
+        if ($queue->status != 'IN_SURVEY') {
             $this->_json(array(
                 'status'  => 'warning',
                 'message' => "Antrean {$queue->queue_number} sudah berstatus {$queue->status}."
@@ -60,7 +78,7 @@ class Yardman extends MY_Controller {
             return;
         }
 
-        // Blok yard wajib dipilih (jika master yard_zones terisi) agar heatmap kepadatan akurat
+        // SCAN 2: survey selesai, blok penempatan ditentukan Yardman
         $zone = NULL;
         if ($zone_code !== '') {
             $zone = $this->db->get_where('yard_zones', array('zone_code' => $zone_code))->row();
@@ -69,7 +87,7 @@ class Yardman extends MY_Controller {
                 return;
             }
         } elseif ($this->db->count_all('yard_zones') > 0) {
-            $this->_json(array('status' => 'error', 'message' => 'Pilih Blok Yard terlebih dahulu sebelum scan!'));
+            $this->_json(array('status' => 'error', 'message' => 'Survey selesai: pilih Depo & Blok penempatan terlebih dahulu, lalu scan ulang!'));
             return;
         }
 
@@ -82,15 +100,15 @@ class Yardman extends MY_Controller {
             $update['current_zone_id'] = $zone->id;
         }
 
-        if (!$this->_transition($queue->id, 'IN_YARD', $update)) {
+        if (!$this->_transition($queue->id, 'IN_SURVEY', $update)) {
             $this->_json(array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
             return;
         }
 
-        $zone_text = $zone ? " di Blok {$zone->zone_code}" : '';
+        $zone_text = $zone ? "\nPenempatan: {$zone->depo} - Blok {$zone->zone_code}." : '';
         $this->_json(array(
             'status'  => 'success',
-            'message' => "VERIFIKASI YARD BERHASIL!\nTruk {$queue->license_plate} terkonfirmasi melayani{$zone_text}."
+            'message' => "SURVEY SELESAI!\nContainer {$queue->container_no} ({$queue->license_plate}).{$zone_text}"
         ));
     }
 }

@@ -76,7 +76,7 @@ class Auth extends MY_Controller {
             $this->db->or_where("REPLACE(license_plate, ' ', '') = " . $this->db->escape($compact_plate), NULL, FALSE);
         $this->db->group_end();
         $this->db->group_start();
-            $this->db->where_in('status', array('IN_YARD', 'AT_YARD'));
+            $this->db->where_in('status', $this->in_depo_statuses);
             $this->db->or_group_start();
                 $this->db->where('status', 'WAITING_GATE');
                 $this->db->where('created_at >=', $this->_expiry_cutoff());

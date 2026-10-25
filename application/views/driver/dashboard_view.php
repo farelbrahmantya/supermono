@@ -12,7 +12,17 @@
         .header-bg { background-color: #1a365d; color: white; padding: 20px; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; }
         .card-custom { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
         .btn-sos { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 999; border-radius: 50px; padding: 12px 30px; font-weight: bold; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4); }
-        .timer-circle { width: 140px; height: 140px; border-radius: 50%; border: 6px solid #198754; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px auto; transition: all 0.3s ease; }
+        .timer-circle { width: 170px; height: 170px; border-radius: 50%; border: 8px solid #198754; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px auto; transition: all 0.3s ease; }
+        .timer-circle.late { border-color: #dc3545; }
+        .timer-total { display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; border-radius: 50px; padding: 6px 14px; font-size: 13px; }
+        .timer-total.late { background: #fde2e4; color: #b42318; }
+        .stepper { display: flex; justify-content: space-between; margin: 4px 0 8px; }
+        .step { flex: 1; text-align: center; font-size: 11px; color: #94a3b8; position: relative; }
+        .step .dot { width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px; font-weight: 700; font-size: 12px; }
+        .step.done .dot { background: #198754; color: #fff; }
+        .step.active .dot { background: #0d6efd; color: #fff; box-shadow: 0 0 0 4px rgba(13,110,253,0.2); }
+        .step.active, .step.done { color: #1e293b; font-weight: 600; }
+        .location-box { background: #0b1e38; color: #fff; border-radius: 15px; padding: 14px; }
     </style>
 </head>
 <body>
@@ -45,35 +55,88 @@
                 <div class="alert alert-success py-2 small border-0 shadow-sm mb-3"><?= html_escape($this->session->flashdata('success_sos')); ?></div>
             <?php endif; ?>
 
+            <?php
+                $status_labels = array(
+                    'WAITING_GATE' => 'Menunggu Gate In',
+                    'IN_YARD'      => 'Menuju Area Survey',
+                    'IN_SURVEY'    => 'Sedang Survey',
+                    'AT_YARD'      => 'Menuju Gate Out',
+                    'COMPLETED'    => 'Selesai'
+                );
+                $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'AT_YARD' => 2);
+                $current_step = isset($step_index[$queue->status]) ? $step_index[$queue->status] : -1;
+            ?>
+
             <!-- Card Nomor Antrean & FIFO -->
             <div class="card card-custom p-3 text-center mb-3">
                 <span class="text-muted small">Nomor Antrean Anda:</span>
                 <h1 class="fw-bold text-primary display-5 mb-0">#<?= html_escape($queue->queue_number); ?></h1>
                 <div class="mt-2">
                     <span id="positionBadge" class="badge bg-primary" <?= $queue_position === NULL ? 'style="display:none;"' : ''; ?>>Urutan ke-<span id="queuePosition"><?= $queue_position; ?></span> (FIFO)</span>
-                    <span id="statusBadge" class="badge <?= in_array($queue->status, array('IN_YARD', 'AT_YARD')) ? 'bg-primary text-white' : ($queue->status == 'COMPLETED' ? 'bg-success text-white' : 'bg-warning text-dark'); ?>">
-                        <?= $queue->status; ?>
+                    <span id="statusBadge" class="badge <?= $queue->status === 'WAITING_GATE' ? 'bg-warning text-dark' : 'bg-primary text-white'; ?>">
+                        <?= html_escape(isset($status_labels[$queue->status]) ? $status_labels[$queue->status] : $queue->status); ?>
                     </span>
                 </div>
                 <small class="text-muted mt-2" id="estimatedWaitText"><?php if ($estimated_wait !== NULL): ?>Estimasi dipanggil Gate In &plusmn;<?= $estimated_wait; ?> menit<?php endif; ?></small>
             </div>
 
-            <!-- Countdown SLA Timer -->
-            <div class="card card-custom p-3 text-center mb-3">
-                <span class="text-muted small">Countdown Target SLA Pelayanan</span>
-                <div class="timer-circle" id="timerBorder">
-                    <span class="h3 fw-bold mb-0" id="slaTimerDisplay"><?= (int) $queue->sla_target_minutes; ?>:00</span>
-                    <small class="text-muted" style="font-size: 10px;">Target: <?= (int) $queue->sla_target_minutes; ?> Mnt</small>
-                </div>
-                <small class="text-muted" id="slaStatusText">Menunggu Scan Gate In oleh Petugas</small>
+            <?php if (!empty($queue->gate_in_at)): ?>
+            <!-- Lokasi Penempatan (ditentukan Yardman setelah survey) -->
+            <div class="location-box text-center mb-3">
+                <?php if (!empty($queue->zone_code)): ?>
+                    <small class="opacity-75 d-block">Lokasi Penempatan Container</small>
+                    <div class="h3 fw-bold mb-0"><?= html_escape($queue->depo); ?> &middot; Blok <?= html_escape($queue->zone_code); ?></div>
+                <?php else: ?>
+                    <small class="opacity-75 d-block">Lokasi Penempatan Container</small>
+                    <div class="fw-semibold">Depo &amp; blok ditentukan Yardman setelah survey selesai</div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Timer KPI: besar = tahap berjalan, kecil = total proses -->
+            <div class="card card-custom p-3 text-center mb-3" id="timerCard">
+                <?php if ($timer !== NULL): ?>
+                    <div class="stepper">
+                        <?php foreach (array('Gate In', 'Survey', 'Gate Out') as $i => $step_name): ?>
+                            <div class="step <?= $i < $current_step ? 'done' : ($i === $current_step ? 'active' : ''); ?>">
+                                <div class="dot"><?= $i < $current_step ? '&#10003;' : $i + 1; ?></div><?= $step_name; ?>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <span class="text-muted small">Timer Tahap: <b id="stageLabel"><?= html_escape($timer['stage_label']); ?></b></span>
+                    <div class="timer-circle" id="stageCircle">
+                        <span class="display-6 fw-bold mb-0" id="stageTimer">--:--</span>
+                        <small class="text-muted" style="font-size: 11px;">Target: <?= (int) $timer['stage_target_minutes']; ?> Mnt</small>
+                    </div>
+                    <div class="timer-total" id="totalBox">
+                        <i class="fas fa-stopwatch"></i> Total proses: <b id="totalTimer">--:--</b> / <?= (int) $timer['total_target_minutes']; ?>:00
+                    </div>
+                    <small class="text-muted d-block mt-2" id="timerStatusText">Timer KPI berjalan sejak Gate In</small>
+                <?php else: ?>
+                    <i class="fas fa-hourglass-half fa-2x text-warning mb-2"></i>
+                    <div class="fw-semibold">Menunggu Gate In</div>
+                    <small class="text-muted">Timer KPI (Gate In &middot; Survey &middot; Gate Out, masing-masing 5 menit) mulai berjalan setelah security scan kitir Anda.</small>
+                <?php endif; ?>
             </div>
 
-            <!-- QR Barcode Kitir -->
+            <!-- Barcode + Data Kitir (muncul setelah Gate In) -->
             <div class="card card-custom p-3 text-center">
-                <span class="text-muted small mb-2">Tunjukkan Barcode ke Petugas Gate / Yardman</span>
-                <div class="d-flex justify-content-center">
-                    <div id="queueQr" data-code="<?= html_escape($queue->queue_number); ?>"></div>
-                </div>
+                <?php if ($qr_payload !== NULL): ?>
+                    <span class="text-muted small mb-2">Tunjukkan Barcode ke Yardman / Petugas Gate Out</span>
+                    <div class="d-flex justify-content-center mb-3">
+                        <div id="queueQr" data-code="<?= html_escape($qr_payload); ?>"></div>
+                    </div>
+                    <table class="table table-sm text-start small mb-0">
+                        <tr><td class="text-muted">No. Container</td><td class="fw-bold"><?= html_escape($queue->container_no); ?></td></tr>
+                        <tr><td class="text-muted">Principal</td><td class="fw-semibold"><?= html_escape($queue->principal); ?></td></tr>
+                        <tr><td class="text-muted">Size</td><td class="fw-semibold"><?= html_escape($queue->container_size); ?></td></tr>
+                        <tr><td class="text-muted">Customer</td><td class="fw-semibold"><?= html_escape($queue->customer); ?></td></tr>
+                    </table>
+                <?php else: ?>
+                    <i class="fas fa-qrcode fa-2x text-muted mb-2"></i>
+                    <div class="fw-semibold">Barcode muncul setelah Gate In</div>
+                    <small class="text-muted">Siapkan kitir Anda untuk di-scan oleh security di Gate In.</small>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -154,39 +217,44 @@
         })();
     </script>
     <script>
-        // QR dibuat di browser, nomor antrean tidak dikirim ke layanan pihak ketiga
-        new QRCode(document.getElementById("queueQr"), { text: $('#queueQr').data('code'), width: 160, height: 160 });
+        // QR dibuat di browser, data tidak dikirim ke layanan pihak ketiga
+        if (document.getElementById("queueQr") && typeof QRCode !== 'undefined') {
+            new QRCode(document.getElementById("queueQr"), { text: $('#queueQr').data('code'), width: 180, height: 180 });
+        }
 
         let currentStatus = "<?= $queue->status; ?>";
-        let timerInterval = null;
+        let stageEnd = null;
+        let totalEnd = null;
 
-        // Countdown memakai sisa detik dari server (tidak bergantung jam HP / format tanggal browser)
-        function startCountdown(remainingSeconds) {
-            if (timerInterval) clearInterval(timerInterval);
-
-            let endTime = Date.now() + remainingSeconds * 1000;
-
-            function tick() {
-                let distance = endTime - Date.now();
-
-                if (distance < 0) {
-                    clearInterval(timerInterval);
-                    document.getElementById("slaTimerDisplay").innerHTML = "OVER SLA";
-                    document.getElementById("slaTimerDisplay").classList.add("text-danger");
-                    document.getElementById("timerBorder").style.borderColor = "#dc3545";
-                    document.getElementById("slaStatusText").innerHTML = "Servis melebihi batas target waktu!";
-                } else {
-                    let minutes = Math.floor(distance / (1000 * 60));
-                    let seconds = Math.floor((distance % (1000 * 60)) / 1000);
-                    document.getElementById("slaTimerDisplay").innerHTML = 
-                        (minutes < 10 ? "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
-                    document.getElementById("slaStatusText").innerHTML = "SLA Sedang Berjalan (Di Area Yard)";
-                }
-            }
-
-            tick();
-            timerInterval = setInterval(tick, 1000);
+        function fmt(seconds) {
+            let neg = seconds < 0;
+            seconds = Math.abs(Math.floor(seconds));
+            let m = Math.floor(seconds / 60), s = seconds % 60;
+            return (neg ? '+' : '') + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
         }
+
+        // Sisa waktu dihitung dari detik yang diberikan server (tidak bergantung jam HP)
+        function setTimers(timer) {
+            if (!timer) return;
+            stageEnd = Date.now() + timer.stage_remaining_seconds * 1000;
+            totalEnd = Date.now() + timer.total_remaining_seconds * 1000;
+            $('#stageLabel').text(timer.stage_label);
+            tick();
+        }
+
+        function tick() {
+            if (stageEnd === null) return;
+            let stageLeft = (stageEnd - Date.now()) / 1000;
+            let totalLeft = (totalEnd - Date.now()) / 1000;
+            $('#stageTimer').text(fmt(stageLeft));
+            $('#totalTimer').text(fmt(totalLeft));
+            $('#stageCircle').toggleClass('late', stageLeft < 0);
+            $('#stageTimer').toggleClass('text-danger', stageLeft < 0);
+            $('#totalBox').toggleClass('late', totalLeft < 0);
+            $('#timerStatusText').text(stageLeft < 0 ? 'Tahap ini melewati target KPI ' + <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?> + ' menit' : 'Timer KPI berjalan sejak Gate In');
+        }
+        setInterval(tick, 1000);
+        setTimers(<?= json_encode($timer, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 
         function updateWaitingInfo(position, estimatedWait) {
             if (position === null) {
@@ -199,12 +267,20 @@
             $('#estimatedWaitText').text(estimatedWait === null ? '' : 'Estimasi dipanggil Gate In \u00b1' + estimatedWait + ' menit');
         }
 
-        // Jalankan timer jika status awal sudah IN_YARD atau AT_YARD
-        <?php if ($sla_remaining_seconds !== NULL): ?>
-        startCountdown(<?= (int) $sla_remaining_seconds; ?>);
-        <?php endif; ?>
+        function showCompleted(durations) {
+            stageEnd = null;
+            let html = '<i class="fas fa-check-circle fa-2x text-success mb-2"></i><div class="fw-bold mb-2">Servis Selesai (Gate Out)</div>';
+            html += '<table class="table table-sm small text-start mb-0">';
+            durations.forEach(function(d) {
+                html += '<tr><td>' + $('<div>').text(d.label).html() + '</td><td class="text-end fw-bold ' + (d.achieved ? 'text-success' : 'text-danger') + '">' +
+                    d.minutes + ' mnt ' + (d.achieved ? '&#10003;' : '&#10007;') + '</td></tr>';
+            });
+            html += '</table>';
+            $('#timerCard').html(html);
+            $('#statusBadge').removeClass('bg-warning text-dark bg-primary').addClass('bg-success text-white').text('Selesai');
+        }
 
-        // AUTO-POLLING: Cek perubahan status setiap 5 detik
+        // AUTO-POLLING: cek status setiap 5 detik, halaman dimuat ulang saat tahap berganti
         setInterval(function() {
             $.ajax({
                 url: "<?= base_url('driver/get_status_json'); ?>",
@@ -213,38 +289,22 @@
                 success: function(res) {
                     if (res.status !== 'success') return;
 
-                    updateWaitingInfo(res.queue_position, res.estimated_wait);
-
                     if (res.queue_status === 'EXPIRED') {
                         window.location.reload();
                         return;
                     }
-
-                    // Jika status diperbarui oleh petugas (misal WAITING_GATE -> IN_YARD / AT_YARD)
-                    if (currentStatus !== res.queue_status) {
-                        currentStatus = res.queue_status;
-
-                        if (res.queue_status === 'IN_YARD' || res.queue_status === 'AT_YARD') {
-                            // Perbarui Badge Status
-                            $('#statusBadge')
-                                .removeClass('bg-warning text-dark bg-success')
-                                .addClass('bg-primary text-white')
-                                .text(res.queue_status);
-                            
-                            if (res.sla_remaining_seconds !== null) {
-                                startCountdown(res.sla_remaining_seconds);
-                            }
-                        } else if (res.queue_status === 'COMPLETED') {
-                            // Hentikan countdown jika servis selesai (Gate Out)
-                            if (timerInterval) clearInterval(timerInterval);
-                            document.getElementById("slaTimerDisplay").innerHTML = "SELESAI";
-                            document.getElementById("slaStatusText").innerHTML = "Servis Telah Selesai (Gate Out)";
-                            $('#statusBadge')
-                                .removeClass('bg-warning bg-primary text-dark')
-                                .addClass('bg-success text-white')
-                                .text('COMPLETED');
-                        }
+                    if (res.queue_status === 'COMPLETED') {
+                        if (currentStatus !== 'COMPLETED') showCompleted(res.stage_durations);
+                        currentStatus = 'COMPLETED';
+                        return;
                     }
+                    if (currentStatus !== res.queue_status) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    updateWaitingInfo(res.queue_position, res.estimated_wait);
+                    setTimers(res.timer);
                 },
                 error: function(xhr) {
                     if (xhr.status === 401) window.location.reload();

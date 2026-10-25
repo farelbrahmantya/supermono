@@ -1,7 +1,7 @@
 -- =====================================================================
 -- LASMONO - Struktur database lengkap (instalasi baru / laptop demo)
 -- Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5.
--- Untuk database yang sudah berjalan, gunakan upgrade_lasmono_db.sql.
+-- Untuk database yang sudah berjalan, gunakan upgrade_lasmono_db.sql lalu upgrade_02_kitir_timer.sql.
 -- Login petugas: yardman1 / admin_ct / gate_in / gate_out, password: password123
 -- =====================================================================
 
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 CREATE TABLE IF NOT EXISTS `yard_zones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `zone_code` varchar(10) NOT NULL,
+  `depo` varchar(20) NOT NULL DEFAULT 'Depo 1',
   `zone_name` varchar(100) NOT NULL,
   `capacity` int(11) NOT NULL DEFAULT '20',
   `created_at` datetime DEFAULT NULL,
@@ -34,14 +35,21 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   `queue_number` varchar(20) NOT NULL,
   `driver_phone` varchar(20) NOT NULL,
   `license_plate` varchar(20) NOT NULL,
-  `status` enum('WAITING_GATE','IN_YARD','AT_YARD','COMPLETED','CANCELLED') NOT NULL DEFAULT 'WAITING_GATE',
+  `status` enum('WAITING_GATE','IN_YARD','IN_SURVEY','AT_YARD','COMPLETED','CANCELLED') NOT NULL DEFAULT 'WAITING_GATE',
   `current_zone_id` int(11) DEFAULT NULL,
+  `cp_id` bigint(20) DEFAULT NULL,
+  `container_no` varchar(15) DEFAULT NULL,
+  `principal` varchar(20) DEFAULT NULL,
+  `container_size` varchar(30) DEFAULT NULL,
+  `customer` varchar(100) DEFAULT NULL,
   `sla_target_minutes` int(11) NOT NULL DEFAULT '15',
   `gate_in_by` int(11) DEFAULT NULL,
+  `survey_start_by` int(11) DEFAULT NULL,
   `yard_scan_by` int(11) DEFAULT NULL,
   `gate_out_by` int(11) DEFAULT NULL,
   `created_at` datetime DEFAULT NULL,
   `gate_in_at` datetime DEFAULT NULL,
+  `survey_start_at` datetime DEFAULT NULL,
   `yard_scan_at` datetime DEFAULT NULL,
   `gate_out_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -52,6 +60,7 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   KEY `idx_gate_out_at` (`gate_out_at`),
   KEY `idx_driver_phone` (`driver_phone`),
   KEY `idx_license_plate` (`license_plate`),
+  KEY `idx_cp_id` (`cp_id`),
   CONSTRAINT `fk_queue_zone` FOREIGN KEY (`current_zone_id`) REFERENCES `yard_zones` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -75,34 +84,34 @@ INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `created_at`)
 (3, 'Security Gate In', 'gate_in', '$2a$10$xMMGFJunUxU7qpo9Lkq52OZtIHMu/2FqaoUBSRXkSiDgfzUs9GxBG', 'GATE_IN', NOW()),
 (4, 'Security Gate Out', 'gate_out', '$2a$10$/LdGNFVlBfGiLWxZhrwqFemdja41nZ8ONzI.ct8QkYmOF1HXK2MP2', 'GATE_OUT', NOW());
 
-INSERT INTO `yard_zones` (`zone_code`, `zone_name`, `capacity`, `created_at`) VALUES
-('A1', 'Blok A1', 20, NOW()),
-('A2', 'Blok A2', 20, NOW()),
-('A3', 'Blok A3', 20, NOW()),
-('A4', 'Blok A4', 20, NOW()),
-('A5', 'Blok A5', 20, NOW()),
-('B1', 'Blok B1', 20, NOW()),
-('B2', 'Blok B2', 20, NOW()),
-('B3', 'Blok B3', 20, NOW()),
-('B4', 'Blok B4', 20, NOW()),
-('B5', 'Blok B5', 20, NOW()),
-('C1', 'Blok C1', 20, NOW()),
-('C2', 'Blok C2', 20, NOW()),
-('C3', 'Blok C3', 20, NOW()),
-('C4', 'Blok C4', 20, NOW()),
-('C5', 'Blok C5', 20, NOW()),
-('D1', 'Blok D1', 20, NOW()),
-('D2', 'Blok D2', 20, NOW()),
-('D3', 'Blok D3', 20, NOW()),
-('D4', 'Blok D4', 20, NOW()),
-('D5', 'Blok D5', 20, NOW()),
-('E1', 'Blok E1', 20, NOW()),
-('E2', 'Blok E2', 20, NOW()),
-('E3', 'Blok E3', 20, NOW()),
-('E4', 'Blok E4', 20, NOW()),
-('E5', 'Blok E5', 20, NOW()),
-('F1', 'Blok F1', 20, NOW()),
-('F2', 'Blok F2', 20, NOW()),
-('F3', 'Blok F3', 20, NOW()),
-('F4', 'Blok F4', 20, NOW()),
-('F5', 'Blok F5', 20, NOW());
+INSERT INTO `yard_zones` (`zone_code`, `depo`, `zone_name`, `capacity`, `created_at`) VALUES
+('A1', 'Depo 1', 'Blok A1', 20, NOW()),
+('A2', 'Depo 1', 'Blok A2', 20, NOW()),
+('A3', 'Depo 1', 'Blok A3', 20, NOW()),
+('A4', 'Depo 1', 'Blok A4', 20, NOW()),
+('A5', 'Depo 1', 'Blok A5', 20, NOW()),
+('B1', 'Depo 1', 'Blok B1', 20, NOW()),
+('B2', 'Depo 1', 'Blok B2', 20, NOW()),
+('B3', 'Depo 1', 'Blok B3', 20, NOW()),
+('B4', 'Depo 1', 'Blok B4', 20, NOW()),
+('B5', 'Depo 1', 'Blok B5', 20, NOW()),
+('C1', 'Depo 1', 'Blok C1', 20, NOW()),
+('C2', 'Depo 1', 'Blok C2', 20, NOW()),
+('C3', 'Depo 1', 'Blok C3', 20, NOW()),
+('C4', 'Depo 1', 'Blok C4', 20, NOW()),
+('C5', 'Depo 1', 'Blok C5', 20, NOW()),
+('D1', 'Depo 2', 'Blok D1', 20, NOW()),
+('D2', 'Depo 2', 'Blok D2', 20, NOW()),
+('D3', 'Depo 2', 'Blok D3', 20, NOW()),
+('D4', 'Depo 2', 'Blok D4', 20, NOW()),
+('D5', 'Depo 2', 'Blok D5', 20, NOW()),
+('E1', 'Depo 2', 'Blok E1', 20, NOW()),
+('E2', 'Depo 2', 'Blok E2', 20, NOW()),
+('E3', 'Depo 2', 'Blok E3', 20, NOW()),
+('E4', 'Depo 2', 'Blok E4', 20, NOW()),
+('E5', 'Depo 2', 'Blok E5', 20, NOW()),
+('F1', 'Depo 2', 'Blok F1', 20, NOW()),
+('F2', 'Depo 2', 'Blok F2', 20, NOW()),
+('F3', 'Depo 2', 'Blok F3', 20, NOW()),
+('F4', 'Depo 2', 'Blok F4', 20, NOW()),
+('F5', 'Depo 2', 'Blok F5', 20, NOW());

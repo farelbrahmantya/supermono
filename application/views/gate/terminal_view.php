@@ -232,14 +232,35 @@
                         <div class="d-inline-flex p-3 bg-light rounded-circle text-primary mb-3">
                             <i class="fas fa-barcode fa-3x"></i>
                         </div>
-                        <h4 class="fw-bold text-dark mb-1">Arahkan Scanner ke Barcode Kitir</h4>
-                        <p class="text-muted small mb-0">Input terdeteksi otomatis saat pemindai laser memindai kode dokumen supir</p>
+                        <h4 class="fw-bold text-dark mb-1"><?= $role == 'GATE_OUT' ? 'Arahkan Scanner ke Barcode di HP Supir' : 'Arahkan Scanner ke Barcode Kitir'; ?></h4>
+                        <p class="text-muted small mb-0"><?= $role == 'GATE_OUT' ? 'Barcode supir muncul setelah Gate In dan berisi data container' : 'Gate In: scan barcode kitir (contoh Z02155544), lalu pilih truk dan konfirmasi'; ?></p>
                     </div>
 
                     <!-- Input Box -->
                     <div class="barcode-box-wrapper mb-4">
                         <input type="text" id="gateBarcodeInput" class="form-control barcode-input" placeholder="READY TO SCAN..." autofocus autocomplete="off">
                         <div class="laser-line-subtle"></div>
+                    </div>
+
+                    <!-- Panel Konfirmasi Gate In (muncul setelah scan barcode kitir) -->
+                    <div id="kitirPanel" class="text-start border rounded-4 p-3 mb-4" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0"><i class="fas fa-file-alt text-primary me-2"></i>Data Kitir <span id="kitirBarcode" class="text-muted small"></span></h6>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="kitirCancel">Batal</button>
+                        </div>
+                        <table class="table table-sm small mb-3">
+                            <tr><td class="text-muted" style="width: 35%;">No. Container</td><td class="fw-bold" id="kitirContainer"></td></tr>
+                            <tr><td class="text-muted">Principal</td><td class="fw-semibold" id="kitirPrincipal"></td></tr>
+                            <tr><td class="text-muted">Size</td><td class="fw-semibold" id="kitirSize"></td></tr>
+                            <tr><td class="text-muted">Customer</td><td class="fw-semibold" id="kitirCustomer"></td></tr>
+                            <tr><td class="text-muted">Nopol di Kitir</td><td class="fw-semibold" id="kitirNopol"></td></tr>
+                        </table>
+                        <label class="form-label small fw-bold text-muted mb-1">TRUK YANG GATE IN (urut FIFO)</label>
+                        <select id="kitirQueueSelect" class="form-select fw-bold mb-3"></select>
+                        <button type="button" class="btn btn-success w-100 fw-bold py-2" id="kitirConfirm">
+                            <i class="fas fa-check me-1"></i> KONFIRMASI GATE IN
+                        </button>
+                        <small class="text-muted d-block text-center mt-1">atau tekan Enter</small>
                     </div>
 
                     <div class="d-flex justify-content-center align-items-center gap-4 text-muted small">
@@ -367,7 +388,7 @@
             }
             let html = '';
             rows.forEach(function(r) {
-                html += '<tr>' +
+                html += '<tr data-queue="' + esc(r.queue_number) + '" style="cursor: pointer;">' +
                     '<td class="fw-bold text-primary">' + esc(r.queue_number) + '</td>' +
                     '<td>' + esc(r.license_plate) + '</td>' +
                     (showZone ? '<td>' + esc(r.zone_code || '-') + '</td>' : '') +
@@ -394,65 +415,140 @@
         // Kunci kursor otomatis agar tidak lepas dari input box
         $(document).ready(function() {$('#gateBarcodeInput').focus();
             
-            $(document).click(function() {$('#gateBarcodeInput').focus();
+            $(document).click(function(e) {
+                // Jangan rebut fokus saat petugas memilih truk di panel kitir
+                if (!$(e.target).closest('#kitirPanel').length) $('#gateBarcodeInput').focus();
             });
         });
+
+        const IS_GATE_IN = <?= in_array($role, array('GATE_IN', 'CONTROL_TOWER')) ? 'true' : 'false'; ?>;
+        let currentKitir = null;
 
         // Deteksi Otomatis saat Barcode Scanner menekan tombol Enter
         $('#gateBarcodeInput').keypress(function(e) {
             if (e.which === 13) {
-                let code = $(this).val().trim();
+                let code = $(this).val().trim().toUpperCase();
+                // Enter tanpa isi saat panel kitir terbuka = konfirmasi Gate In
+                if (code === '' && currentKitir) {
+                    $('#kitirConfirm').click();
+                    return;
+                }
                 if (code !== '') {
-                    sendGateScan(code);
+                    // Barcode kitir (Z + angka) = proses Gate In, selain itu QR supir (Gate Out)
+                    if (IS_GATE_IN && /^Z\d{6,12}$/.test(code)) {
+                        lookupKitir(code);
+                    } else {
+                        sendGateScan(code);
+                    }
                     $(this).val('');
                 }
             }
         });
 
-        function sendGateScan(code, retried) {
+        function showResult(res) {
+            let alertClass = res.status === 'success' ? 'alert-success text-success' : (res.status === 'warning' ? 'alert-warning text-dark' : 'alert-danger text-danger');
+            let icon = res.status === 'success' ? 'check-circle' : 'exclamation-circle';
+
+            $('#scanResult')
+                .stop(true, true)
+                .removeClass('alert-success alert-warning alert-danger text-success text-dark text-danger')
+                .addClass(alertClass)
+                .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + esc(res.message).replace(/\n/g, "<br>") + '</b>')
+                .fadeIn();
+
+            clearTimeout(window.scanResultTimer);
+            window.scanResultTimer = setTimeout(function() { $('#scanResult').fadeOut(); }, 5000);
+        }
+
+        // POST dengan token CSRF; jika token basi (403) ambil token baru lalu ulangi sekali
+        function postJson(url, data, onSuccess, retried) {
+            data[CSRF_NAME] = CSRF_HASH;
             $.ajax({
-                url: "<?= base_url('gate/process_scan'); ?>",
+                url: url,
                 type: "POST",
-                data: { queue_number: code, [CSRF_NAME]: CSRF_HASH },
+                data: data,
                 dataType: "json",
-                success: function(res) {
-                    let alertClass = res.status === 'success' ? 'alert-success text-success' : (res.status === 'warning' ? 'alert-warning text-dark' : 'alert-danger text-danger');
-                    let icon = res.status === 'success' ? 'check-circle' : 'exclamation-circle';
-
-                    $('#scanResult')
-                        .removeClass('alert-success alert-warning alert-danger text-success text-dark text-danger')
-                        .addClass(alertClass)
-                        .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + esc(res.message).replace(/\n/g, "<br>") + '</b>')
-                        .fadeIn();
-
-                    if (res.status === 'success') {
-                        addRecentRow(code, res.message);
-                        loadPending();
-                    }
-
-                    setTimeout(function() {
-                        $('#scanResult').fadeOut();
-                    }, 4000);
-                },
+                success: onSuccess,
                 error: function(xhr) {
                     if (xhr.status === 403 && !retried) {
-                        refreshCsrf(function(ok) { if (ok) sendGateScan(code, true); });
+                        refreshCsrf(function(ok) { if (ok) postJson(url, data, onSuccess, true); });
                         return;
                     }
                     let msg = xhr.status === 401 || xhr.status === 403
                         ? 'Sesi berakhir. Halaman dimuat ulang...'
                         : 'Gagal terhubung ke server. Scan ulang barcode.';
-                    $('#scanResult')
-                        .removeClass('alert-success alert-warning text-success text-dark')
-                        .addClass('alert-danger text-danger')
-                        .text(msg)
-                        .fadeIn();
+                    showResult({ status: 'error', message: msg });
                     if (xhr.status === 401 || xhr.status === 403) {
                         setTimeout(function() { window.location.reload(); }, 1500);
                     }
                 }
             });
         }
+
+        function sendGateScan(code) {
+            postJson("<?= base_url('gate/process_scan'); ?>", { queue_number: code }, function(res) {
+                showResult(res);
+                if (res.status === 'success') {
+                    let match = code.match(/A-\d{8}-\d{3}/);
+                    addRecentRow(match ? match[0] : code, res.message);
+                    loadPending();
+                }
+            });
+        }
+
+        function closeKitir() {
+            currentKitir = null;
+            $('#kitirPanel').hide();
+            $('#gateBarcodeInput').focus();
+        }
+
+        function lookupKitir(code) {
+            postJson("<?= base_url('gate/lookup_kitir'); ?>", { barcode: code }, function(res) {
+                if (res.status !== 'success') {
+                    closeKitir();
+                    showResult(res);
+                    return;
+                }
+                currentKitir = res.kitir;
+                $('#kitirBarcode').text('(' + res.kitir.barcode + ')');
+                $('#kitirContainer').text(res.kitir.container_no);
+                $('#kitirPrincipal').text(res.kitir.principal || '-');
+                $('#kitirSize').text(res.kitir.size || '-');
+                $('#kitirCustomer').text(res.kitir.customer || '-');
+                $('#kitirNopol').text(res.kitir.nopol || '-');
+
+                let options = '';
+                res.candidates.forEach(function(c, i) {
+                    options += '<option value="' + esc(c.queue_number) + '"' + (c.queue_number === res.suggested ? ' selected' : '') + '>' +
+                        (i + 1) + '. ' + esc(c.license_plate) + ' - #' + esc(c.queue_number) + ' (' + esc(c.waiting_minutes) + ' mnt)</option>';
+                });
+                $('#kitirQueueSelect').html(options);
+                $('#kitirPanel').show();
+                $('#gateBarcodeInput').focus();
+            });
+        }
+
+        $('#kitirCancel').on('click', closeKitir);
+
+        $('#kitirConfirm').on('click', function() {
+            if (!currentKitir) return;
+            let btn = $(this).prop('disabled', true);
+            let queueNumber = $('#kitirQueueSelect').val();
+            postJson("<?= base_url('gate/process_gate_in'); ?>", { barcode: currentKitir.barcode, queue_number: queueNumber }, function(res) {
+                btn.prop('disabled', false);
+                showResult(res);
+                if (res.status === 'success') {
+                    addRecentRow(queueNumber, res.message);
+                    closeKitir();
+                    loadPending();
+                }
+            });
+        });
+
+        // Klik truk di daftar pending untuk memilihnya di panel kitir
+        $(document).on('click', '#pendingGateInBody tr[data-queue]', function() {
+            if (currentKitir) $('#kitirQueueSelect').val($(this).data('queue'));
+        });
 
         function addRecentRow(code, msg) {
             $('#emptyScanRow').hide();
