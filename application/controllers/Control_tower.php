@@ -134,45 +134,45 @@ class Control_tower extends MY_Controller {
         return $queues;
     }
 
+    // Tandai laporan SOS sudah ditindaklanjuti
+    public function resolve_sos() {
+        $this->db->where('id', (int) $this->input->post('sos_id'))
+                 ->where('is_resolved', 0)
+                 ->update('sos_reports', array('is_resolved' => 1));
+        $this->_json(array('status' => $this->db->affected_rows() === 1 ? 'success' : 'warning'));
+    }
+
     private function _get_sos_reports() {
         return $this->db->query("
-            SELECT s.created_at, s.report_type, s.description, s.media_path, q.queue_number, q.license_plate
+            SELECT s.id, s.created_at, s.report_type, s.description, s.media_path, s.is_resolved, q.queue_number, q.license_plate 
             FROM sos_reports s
             JOIN queue_transactions q ON s.queue_id = q.id
-            ORDER BY s.id DESC
+            ORDER BY s.is_resolved ASC, s.id DESC
             LIMIT 100
         ")->result();
     }
 
     private function _get_yard_density() {
-        // Jumlah truk yang sedang dilayani (AT_YARD) per blok, satu query untuk semua blok
+        // Jumlah truk yang sedang dilayani (AT_YARD) per blok dibanding kapasitas blok
         $rows = $this->db->query("
-            SELECT z.zone_code, COUNT(q.id) AS total
+            SELECT z.zone_code, z.capacity, COUNT(q.id) AS total
             FROM yard_zones z
             LEFT JOIN queue_transactions q ON q.current_zone_id = z.id AND q.status = 'AT_YARD'
-            GROUP BY z.zone_code
+            GROUP BY z.id, z.zone_code, z.capacity
+            ORDER BY z.zone_code ASC
         ")->result();
 
-        $counts = array();
-        foreach ($rows as $row) {
-            $counts[$row->zone_code] = (int) $row->total;
-        }
-
-        // Grid Matriks Yard A1 - F5
-        $zones = array('A', 'B', 'C', 'D', 'E', 'F');
         $grid = array();
+        foreach ($rows as $row) {
+            $count    = (int) $row->total;
+            $capacity = max(1, (int) $row->capacity);
+            $percent  = $count / $capacity * 100;
 
-        foreach ($zones as $z) {
-            for ($i = 1; $i <= 5; $i++) {
-                $code  = $z . $i;
-                $count = isset($counts[$code]) ? $counts[$code] : 0;
+            $level = 'low';
+            if ($percent >= 80) $level = 'high';
+            elseif ($percent >= 50) $level = 'medium';
 
-                $level = 'low';
-                if ($count > 10) $level = 'high';
-                elseif ($count > 5) $level = 'medium';
-
-                $grid[$code] = array('count' => $count, 'level' => $level);
-            }
+            $grid[$row->zone_code] = array('count' => $count, 'capacity' => (int) $row->capacity, 'level' => $level);
         }
         return $grid;
     }

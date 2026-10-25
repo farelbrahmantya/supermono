@@ -1,0 +1,108 @@
+-- =====================================================================
+-- LASMONO - Struktur database lengkap (instalasi baru / laptop demo)
+-- Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5.
+-- Untuk database yang sudah berjalan, gunakan upgrade_lasmono_db.sql.
+-- Login petugas: yardman1 / admin_ct / gate_in / gate_out, password: password123
+-- =====================================================================
+
+SET SQL_MODE="NO_AUTO_VALUE_ON_ZERO";
+SET NAMES utf8;
+
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `role` enum('GATE_IN','GATE_OUT','YARDMAN','CONTROL_TOWER') NOT NULL DEFAULT 'YARDMAN',
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `yard_zones` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `zone_code` varchar(10) NOT NULL,
+  `zone_name` varchar(100) NOT NULL,
+  `capacity` int(11) NOT NULL DEFAULT '20',
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_zone_code` (`zone_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `queue_transactions` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `queue_number` varchar(20) NOT NULL,
+  `driver_phone` varchar(20) NOT NULL,
+  `license_plate` varchar(20) NOT NULL,
+  `status` enum('WAITING_GATE','IN_YARD','AT_YARD','COMPLETED','CANCELLED') NOT NULL DEFAULT 'WAITING_GATE',
+  `current_zone_id` int(11) DEFAULT NULL,
+  `sla_target_minutes` int(11) NOT NULL DEFAULT '15',
+  `gate_in_by` int(11) DEFAULT NULL,
+  `yard_scan_by` int(11) DEFAULT NULL,
+  `gate_out_by` int(11) DEFAULT NULL,
+  `created_at` datetime DEFAULT NULL,
+  `gate_in_at` datetime DEFAULT NULL,
+  `yard_scan_at` datetime DEFAULT NULL,
+  `gate_out_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_queue_number` (`queue_number`),
+  KEY `fk_zone` (`current_zone_id`),
+  KEY `idx_status_created` (`status`, `created_at`),
+  KEY `idx_gate_in_at` (`gate_in_at`),
+  KEY `idx_gate_out_at` (`gate_out_at`),
+  KEY `idx_driver_phone` (`driver_phone`),
+  KEY `idx_license_plate` (`license_plate`),
+  CONSTRAINT `fk_queue_zone` FOREIGN KEY (`current_zone_id`) REFERENCES `yard_zones` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `sos_reports` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `queue_id` bigint(20) NOT NULL,
+  `report_type` enum('PUNGLI','PENYEROBOTAN','LAINNYA') NOT NULL DEFAULT 'PUNGLI',
+  `description` text,
+  `media_path` varchar(255) DEFAULT NULL,
+  `is_resolved` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `fk_queue` (`queue_id`),
+  KEY `idx_resolved` (`is_resolved`),
+  CONSTRAINT `fk_sos_queue` FOREIGN KEY (`queue_id`) REFERENCES `queue_transactions` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `created_at`) VALUES
+(1, 'Yardman', 'yardman1', '$2a$10$s.JxmO8sGJMbMWaXZGUaEOQLDBE4v9/ixnUpB9NkHBzcqu.6qRHQy', 'YARDMAN', NOW()),
+(2, 'Supervisor Control Tower', 'admin_ct', '$2a$10$YV9AonYqCje045qqtoU1KeNmW85yn.ZrEtb2G42NH52czGcAHkmTe', 'CONTROL_TOWER', NOW()),
+(3, 'Security Gate In', 'gate_in', '$2a$10$xMMGFJunUxU7qpo9Lkq52OZtIHMu/2FqaoUBSRXkSiDgfzUs9GxBG', 'GATE_IN', NOW()),
+(4, 'Security Gate Out', 'gate_out', '$2a$10$/LdGNFVlBfGiLWxZhrwqFemdja41nZ8ONzI.ct8QkYmOF1HXK2MP2', 'GATE_OUT', NOW());
+
+INSERT INTO `yard_zones` (`zone_code`, `zone_name`, `capacity`, `created_at`) VALUES
+('A1', 'Blok A1', 20, NOW()),
+('A2', 'Blok A2', 20, NOW()),
+('A3', 'Blok A3', 20, NOW()),
+('A4', 'Blok A4', 20, NOW()),
+('A5', 'Blok A5', 20, NOW()),
+('B1', 'Blok B1', 20, NOW()),
+('B2', 'Blok B2', 20, NOW()),
+('B3', 'Blok B3', 20, NOW()),
+('B4', 'Blok B4', 20, NOW()),
+('B5', 'Blok B5', 20, NOW()),
+('C1', 'Blok C1', 20, NOW()),
+('C2', 'Blok C2', 20, NOW()),
+('C3', 'Blok C3', 20, NOW()),
+('C4', 'Blok C4', 20, NOW()),
+('C5', 'Blok C5', 20, NOW()),
+('D1', 'Blok D1', 20, NOW()),
+('D2', 'Blok D2', 20, NOW()),
+('D3', 'Blok D3', 20, NOW()),
+('D4', 'Blok D4', 20, NOW()),
+('D5', 'Blok D5', 20, NOW()),
+('E1', 'Blok E1', 20, NOW()),
+('E2', 'Blok E2', 20, NOW()),
+('E3', 'Blok E3', 20, NOW()),
+('E4', 'Blok E4', 20, NOW()),
+('E5', 'Blok E5', 20, NOW()),
+('F1', 'Blok F1', 20, NOW()),
+('F2', 'Blok F2', 20, NOW()),
+('F3', 'Blok F3', 20, NOW()),
+('F4', 'Blok F4', 20, NOW()),
+('F5', 'Blok F5', 20, NOW());

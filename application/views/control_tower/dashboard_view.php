@@ -36,7 +36,7 @@
         </div>
         <div class="d-flex align-items-center">
             <button class="btn btn-danger btn-sm me-3 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#sosModal">
-                <i class="fas fa-bell me-1"></i> SOS (<span id="sosCount"><?= count($sos_reports); ?></span>)
+                <i class="fas fa-bell me-1"></i> SOS (<span id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>)
             </button>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-warning btn-sm me-3 fw-bold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
             <span class="me-3 text-light opacity-75 small">Admin: <?= html_escape($admin_name); ?></span>
@@ -135,11 +135,14 @@
                     <h5 class="fw-bold mb-4" style="color: #0f172a;">Kepadatan Yard</h5>
                     <div class="grid-density mb-3" id="heatmapGrid">
                         <?php foreach($heatmap as $code => $info): ?>
-                            <div class="density-box density-<?= $info['level']; ?>" title="<?= $info['count']; ?> truk">
+                            <div class="density-box density-<?= $info['level']; ?>" title="<?= $info['count']; ?>/<?= $info['capacity']; ?> truk">
                                 <?= $code; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <?php if (empty($heatmap)): ?>
+                        <small class="text-muted d-block">Belum ada data blok yard (tabel yard_zones kosong).</small>
+                    <?php endif; ?>
                     <div class="mt-4 pt-2 border-top">
                         <small class="fw-bold text-muted d-block mb-2">Density</small>
                         <div class="d-flex align-items-center gap-3 small text-muted">
@@ -171,6 +174,7 @@
                                 <th>Jenis</th>
                                 <th>Deskripsi</th>
                                 <th>Bukti</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody id="sosTableBody">
@@ -190,6 +194,13 @@
                                         <span class="text-muted small">- Tidak ada -</span>
                                     <?php endif; ?>
                                 </td>
+                                <td>
+                                    <?php if($sos->is_resolved): ?>
+                                        <span class="badge bg-success">Selesai</span>
+                                    <?php else: ?>
+                                        <button type="button" class="btn btn-sm btn-success fw-bold py-0 btn-resolve-sos" data-id="<?= (int) $sos->id; ?>">Tandai Selesai</button>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                     </tbody>
@@ -202,6 +213,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const MEDIA_BASE = "<?= base_url(); ?>";
+        const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
+        const CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
 
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
@@ -224,14 +237,19 @@
         function renderHeatmap(heatmap) {
             let html = '';
             $.each(heatmap, function(code, info) {
-                html += '<div class="density-box density-' + esc(info.level) + '" title="' + esc(info.count) + ' truk">' + esc(code) + '</div>';
+                html += '<div class="density-box density-' + esc(info.level) + '" title="' + esc(info.count) + '/' + esc(info.capacity) + ' truk">' + esc(code) + '</div>';
             });
             $('#heatmapGrid').html(html);
         }
 
         function renderSos(reports) {
             let html = '';
+            let openCount = 0;
             reports.forEach(function(sos) {
+                if (sos.is_resolved == 0) openCount++;
+                let status = sos.is_resolved == 1
+                    ? '<span class="badge bg-success">Selesai</span>'
+                    : '<button type="button" class="btn btn-sm btn-success fw-bold py-0 btn-resolve-sos" data-id="' + esc(sos.id) + '">Tandai Selesai</button>';
                 let media = sos.media_path
                     ? '<a href="' + esc(MEDIA_BASE + sos.media_path) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger fw-bold py-0"><i class="fas fa-paperclip me-1"></i> Lihat Bukti</a>'
                     : '<span class="text-muted small">- Tidak ada -</span>';
@@ -242,10 +260,32 @@
                     '<td><span class="badge bg-danger">' + esc(sos.report_type) + '</span></td>' +
                     '<td>' + esc(sos.description) + '</td>' +
                     '<td>' + media + '</td>' +
+                    '<td>' + status + '</td>' +
                 '</tr>';
             });
             $('#sosTableBody').html(html);
+            $('#sosCount').text(openCount);
         }
+
+        $(document).on('click', '.btn-resolve-sos', function() {
+            let btn = $(this);
+            btn.prop('disabled', true);
+            $.ajax({
+                url: "<?= base_url('control_tower/resolve_sos'); ?>",
+                type: "POST",
+                data: { sos_id: btn.data('id'), [CSRF_NAME]: CSRF_HASH },
+                dataType: "json",
+                success: function() {
+                    btn.replaceWith('<span class="badge bg-success">Selesai</span>');
+                    let open = parseInt($('#sosCount').text(), 10) || 0;
+                    $('#sosCount').text(Math.max(0, open - 1));
+                },
+                error: function(xhr) {
+                    if (xhr.status === 401 || xhr.status === 403) window.location.reload();
+                    btn.prop('disabled', false);
+                }
+            });
+        });
 
         setInterval(function() {
             $.ajax({
@@ -259,7 +299,6 @@
                     $('#kpiExpired').text(data.kpi.truck_expired);
                     $('#kpiInYard').text(data.kpi.truck_in_yard);
                     $('#kpiGateIn').text(data.kpi.gate_in_last_hour);
-                    $('#sosCount').text(data.sos_reports.length);
                     renderQueues(data.queues);
                     renderHeatmap(data.heatmap);
                     renderSos(data.sos_reports);
