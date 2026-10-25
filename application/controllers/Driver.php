@@ -30,6 +30,7 @@ class Driver extends MY_Controller {
         $data['queue_position']        = $queue->status === 'WAITING_GATE' ? $this->_queue_position($queue) : NULL;
         $data['estimated_wait']        = $this->_estimated_wait($data['queue_position']);
         $data['timer']                 = $this->_timer_info($queue);
+        $data['stage_durations']       = $this->_stage_durations($queue);
         // Barcode baru muncul setelah Gate In (berisi data kitir)
         $data['qr_payload']            = empty($queue->gate_in_at) ? NULL : $this->_qr_payload($queue);
 

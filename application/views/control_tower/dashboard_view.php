@@ -44,6 +44,7 @@
             <button id="sosButton" class="btn btn-danger btn-sm me-3 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#sosModal">
                 <i class="fas fa-bell me-1"></i> SOS (<span id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>)
             </button>
+            <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-light btn-sm me-3 fw-bold"><i class="fas fa-history me-1"></i> Riwayat</a>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-warning btn-sm me-3 fw-bold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
             <span class="me-3 text-light opacity-75 small">Admin: <?= html_escape($admin_name); ?></span>
             <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i></a>

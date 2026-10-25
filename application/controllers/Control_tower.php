@@ -19,6 +19,147 @@ class Control_tower extends MY_Controller {
         $this->load->view('control_tower/dashboard_view', $data);
     }
 
+    // Riwayat truk yang sudah selesai (Gate Out) dalam rentang tanggal
+    public function history() {
+        list($date_from, $date_to, $error) = $this->_history_range();
+        $rows = $error ? array() : $this->_get_history($date_from, $date_to);
+
+        $data = array(
+            'date_from'  => $date_from,
+            'date_to'    => $date_to,
+            'error'      => $error,
+            'rows'       => $rows,
+            'summary'    => $this->_history_summary($rows),
+            'admin_name' => $this->session->userdata('name')
+        );
+        $this->load->view('control_tower/history_view', $data);
+    }
+
+    // Export riwayat ke CSV (dibuka di Excel)
+    public function history_csv() {
+        list($date_from, $date_to, $error) = $this->_history_range();
+        if ($error) {
+            show_error($error, 400);
+            return;
+        }
+        $rows = $this->_get_history($date_from, $date_to);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="riwayat_lasmono_' . $date_from . '_sd_' . $date_to . '.csv"');
+
+        $out = fopen('php://output', 'w');
+        fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
+        fputcsv($out, array(
+            'No. Antrean', 'Nopol', 'No. HP Supir', 'No. Container', 'Principal', 'Size', 'Customer', 'Depo', 'Blok',
+            'Daftar', 'Gate In', 'Masuk Survey', 'Selesai Survey', 'Gate Out',
+            'Antre (mnt)', 'Tahap Gate In (mnt)', 'Tahap Survey (mnt)', 'Tahap Gate Out (mnt)', 'Total Proses (mnt)', 'Capai KPI Semua Tahap',
+            'Petugas Gate In', 'Yardman Survey', 'Yardman Selesai', 'Petugas Gate Out'
+        ), ';');
+        foreach ($rows as $r) {
+            fputcsv($out, array(
+                $r['queue_number'], $r['license_plate'], $r['driver_phone'], $r['container_no'], $r['principal'], $r['container_size'], $r['customer'], $r['depo'], $r['zone_code'],
+                $r['created_at'], $r['gate_in_at'], $r['survey_start_at'], $r['yard_scan_at'], $r['gate_out_at'],
+                $this->_csv_number($r['wait_minutes']), $this->_csv_number($r['stage_gate_in']), $this->_csv_number($r['stage_survey']),
+                $this->_csv_number($r['stage_gate_out']), $this->_csv_number($r['total_minutes']), $r['all_achieved'] ? 'YA' : 'TIDAK',
+                $r['gate_in_name'], $r['survey_start_name'], $r['yard_scan_name'], $r['gate_out_name']
+            ), ';');
+        }
+        fclose($out);
+        exit;
+    }
+
+    // Rentang tanggal dari query string (default hari ini), maksimal 93 hari
+    private function _history_range() {
+        $today     = date('Y-m-d');
+        $date_from = (string) $this->input->get('from');
+        $date_to   = (string) $this->input->get('to');
+        $date_from = preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from) ? $date_from : $today;
+        $date_to   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to) ? $date_to : $today;
+
+        $error = NULL;
+        if ($date_from > $date_to) {
+            $error = 'Tanggal awal tidak boleh melebihi tanggal akhir.';
+        } elseif ((strtotime($date_to) - strtotime($date_from)) / 86400 > 93) {
+            $error = 'Rentang tanggal maksimal 93 hari (3 bulan).';
+        }
+        return array($date_from, $date_to, $error);
+    }
+
+    private function _get_history($date_from, $date_to) {
+        $rows = $this->db->query("
+            SELECT q.*, z.zone_code, z.depo,
+                   ugi.name AS gate_in_name, uss.name AS survey_start_name, uys.name AS yard_scan_name, ugo.name AS gate_out_name
+            FROM queue_transactions q
+            LEFT JOIN yard_zones z ON z.id = q.current_zone_id
+            LEFT JOIN users ugi ON ugi.id = q.gate_in_by
+            LEFT JOIN users uss ON uss.id = q.survey_start_by
+            LEFT JOIN users uys ON uys.id = q.yard_scan_by
+            LEFT JOIN users ugo ON ugo.id = q.gate_out_by
+            WHERE q.status = 'COMPLETED' AND q.gate_out_at >= ? AND q.gate_out_at <= ?
+            ORDER BY q.gate_out_at DESC
+        ", array($date_from . ' 00:00:00', $date_to . ' 23:59:59'))->result_array();
+
+        foreach ($rows as &$r) {
+            $r['wait_minutes']   = $this->_minutes_between($r['created_at'], $r['gate_in_at']);
+            $r['stage_gate_in']  = $this->_minutes_between($r['gate_in_at'], $r['survey_start_at']);
+            $r['stage_survey']   = $this->_minutes_between($r['survey_start_at'], $r['yard_scan_at']);
+            $r['stage_gate_out'] = $this->_minutes_between($r['yard_scan_at'], $r['gate_out_at']);
+            $r['total_minutes']  = $this->_minutes_between($r['gate_in_at'], $r['gate_out_at']);
+
+            $r['all_achieved'] = TRUE;
+            foreach (array('stage_gate_in', 'stage_survey', 'stage_gate_out') as $stage) {
+                if ($r[$stage] === NULL || $r[$stage] > self::STAGE_KPI_MINUTES) {
+                    $r['all_achieved'] = FALSE;
+                }
+            }
+        }
+        unset($r);
+        return $rows;
+    }
+
+    // Ringkasan riwayat: jumlah truk, rata-rata & persentase capai target per tahap
+    private function _history_summary($rows) {
+        $summary = array('total' => count($rows), 'all_achieved' => 0, 'stages' => array());
+        $stages  = array('stage_gate_in' => 'Gate In', 'stage_survey' => 'At Yard (Survey)', 'stage_gate_out' => 'Gate Out', 'total_minutes' => 'Total Proses');
+
+        foreach ($stages as $key => $label) {
+            $values = array();
+            foreach ($rows as $r) {
+                if ($r[$key] !== NULL) {
+                    $values[] = $r[$key];
+                }
+            }
+            $target   = $key === 'total_minutes' ? self::STAGE_KPI_MINUTES * 3 : self::STAGE_KPI_MINUTES;
+            $achieved = 0;
+            foreach ($values as $v) {
+                if ($v <= $target) $achieved++;
+            }
+            $summary['stages'][] = array(
+                'label'    => $label,
+                'target'   => $target,
+                'count'    => count($values),
+                'avg'      => count($values) ? round(array_sum($values) / count($values), 1) : NULL,
+                'percent'  => count($values) ? (int) round($achieved / count($values) * 100) : NULL
+            );
+        }
+        foreach ($rows as $r) {
+            if ($r['all_achieved']) $summary['all_achieved']++;
+        }
+        return $summary;
+    }
+
+    // Desimal pakai koma agar terbaca sebagai angka di Excel berformat Indonesia
+    private function _csv_number($value) {
+        return $value === NULL ? '' : str_replace('.', ',', (string) $value);
+    }
+
+    private function _minutes_between($from, $to) {
+        if (empty($from) || empty($to)) {
+            return NULL;
+        }
+        return round((strtotime($to) - strtotime($from)) / 60, 1);
+    }
+
     // Endpoint API untuk Auto-Refresh Data
     public function get_live_data() {
         $this->_json($this->_get_dashboard_data());

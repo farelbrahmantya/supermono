@@ -146,6 +146,22 @@
         </button>
     </div>
 
+    <!-- Pop Up Tahap Selesai -->
+    <div class="modal fade" id="stageModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 text-center">
+                <div class="modal-body p-4">
+                    <div class="mb-3"><i class="fas fa-check-circle text-success" style="font-size: 64px;"></i></div>
+                    <h4 class="fw-bold mb-2" id="stageModalTitle"></h4>
+                    <div id="stageModalDuration" class="mb-2"></div>
+                    <p class="text-muted mb-3" id="stageModalText"></p>
+                    <div id="stageModalNext" class="alert alert-primary py-2 small fw-semibold mb-3"></div>
+                    <button type="button" class="btn btn-primary w-100 fw-bold" data-bs-dismiss="modal">OK, MENGERTI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Form Lapor SOS -->
     <div class="modal fade" id="sosModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -280,6 +296,52 @@
             $('#statusBadge').removeClass('bg-warning text-dark bg-primary').addClass('bg-success text-white').text('Selesai');
         }
 
+        // POP UP setiap tahap selesai
+        const STAGE_POPUPS = {
+            IN_YARD:   { title: 'Gate In Berhasil!', text: 'Container <?= html_escape($queue->container_no); ?> sudah tercatat masuk depo.', next: 'Selanjutnya: menuju AREA SURVEY dan tunjukkan barcode ke Yardman.' },
+            IN_SURVEY: { title: 'Masuk Area Survey', text: 'Container sedang disurvey oleh Yardman.', next: 'Selanjutnya: tunggu survey selesai, Yardman akan scan barcode Anda lagi.' },
+            AT_YARD:   { title: 'Survey Selesai!', text: <?= json_encode(!empty($queue->zone_code) ? 'Lokasi penempatan: ' . $queue->depo . ' - Blok ' . $queue->zone_code . '.' : 'Survey container sudah selesai.', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, next: 'Selanjutnya: menuju GATE OUT dan tunjukkan barcode ke petugas.' },
+            COMPLETED: { title: 'Gate Out Berhasil!', text: 'Seluruh proses di depo sudah selesai. Terima kasih.', next: 'Hati-hati di jalan.' }
+        };
+
+        function notifyDevice() {
+            try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
+            try {
+                let ctx = new (window.AudioContext || window.webkitAudioContext)();
+                let osc = ctx.createOscillator();
+                let gain = ctx.createGain();
+                osc.frequency.value = 880;
+                gain.gain.value = 0.15;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.25);
+            } catch (e) {}
+        }
+
+        // durasi = tahap yang baru selesai (label, menit, capai target?)
+        function showStagePopup(status, duration) {
+            let popup = STAGE_POPUPS[status];
+            if (!popup) return;
+            $('#stageModalTitle').text(popup.title);
+            $('#stageModalText').text(popup.text);
+            $('#stageModalNext').text(popup.next);
+            $('#stageModalDuration').html(duration
+                ? '<span class="badge fs-6 ' + (duration.achieved ? 'bg-success' : 'bg-danger') + '">Tahap ' + $('<div>').text(duration.label).html() + ': ' + duration.minutes + ' mnt ' + (duration.achieved ? '&#10003;' : '&#10007; lewat target') + '</span>'
+                : '');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('stageModal')).show();
+            notifyDevice();
+        }
+
+        // Setelah halaman dimuat ulang karena tahap berganti (?done=STATUS), tampilkan pop up
+        (function() {
+            let match = window.location.search.match(/[?&]done=([A-Z_]+)/);
+            if (!match || match[1] !== currentStatus) return;
+            let durations = <?= json_encode($stage_durations, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+            showStagePopup(currentStatus, currentStatus === 'IN_YARD' ? null : durations[durations.length - 1]);
+            if (window.history.replaceState) window.history.replaceState(null, '', window.location.pathname);
+        })();
+
         // AUTO-POLLING: cek status setiap 5 detik, halaman dimuat ulang saat tahap berganti
         setInterval(function() {
             $.ajax({
@@ -294,12 +356,15 @@
                         return;
                     }
                     if (res.queue_status === 'COMPLETED') {
-                        if (currentStatus !== 'COMPLETED') showCompleted(res.stage_durations);
+                        if (currentStatus !== 'COMPLETED') {
+                            showCompleted(res.stage_durations);
+                            showStagePopup('COMPLETED', res.stage_durations[res.stage_durations.length - 1]);
+                        }
                         currentStatus = 'COMPLETED';
                         return;
                     }
                     if (currentStatus !== res.queue_status) {
-                        window.location.reload();
+                        window.location.replace(window.location.pathname + '?done=' + res.queue_status);
                         return;
                     }
 
