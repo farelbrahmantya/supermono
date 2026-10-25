@@ -24,6 +24,11 @@
         .badge-yard { background-color: #3b82f6; color: #ffffff; }
         .badge-waiting { background-color: #f59e0b; color: #ffffff; }
         .badge-over-sla { background-color: #ef476f; color: #ffffff; animation: pulse 1.5s infinite; }
+        .stage-card { background: #ffffff; border-radius: 12px; padding: 16px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
+        .stage-card:hover { border-color: #cbd5e1; }
+        .stage-card.active { border-color: #2563eb; background: #eff6ff; }
+        .stage-card.has-overdue { border-left: 6px solid #ef476f; }
+        .stage-late { color: #ef476f; font-weight: 700; }
         .sos-active { animation: pulse 1s infinite; box-shadow: 0 0 0 4px rgba(239, 71, 111, 0.35); }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
@@ -78,7 +83,6 @@
                     <div>
                         <small class="text-muted d-block mb-1">Truk di Yard</small>
                         <h2 class="fw-bold mb-0" style="color: #1e293b;" id="kpiInYard"><?= $kpi['truck_in_yard']; ?></h2>
-                        <small class="text-muted">Pending Yardman <span id="kpiPendingYard"><?= $kpi['pending_yard']; ?></span> &middot; Gate Out <span id="kpiPendingGateOut"><?= $kpi['pending_gate_out']; ?></span></small>
                     </div>
                     <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;">
                         <i class="fas fa-boxes fa-lg"></i>
@@ -98,12 +102,56 @@
             </div>
         </div>
 
+        <!-- Pending per Tahap: klik untuk menyaring tabel Live Antrean -->
+        <h6 class="fw-bold text-muted mb-3">PENDING PER TAHAP <small class="fw-normal">(klik untuk melihat detail)</small></h6>
+        <div class="row g-3 mb-4" id="stageCards">
+            <div class="col-md-4">
+                <div class="stage-card" data-stage="gate_in" role="button" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-1">Pending Gate In</small>
+                            <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
+                            <small class="stage-overdue text-muted">Antre di luar depo</small>
+                        </div>
+                        <div class="icon-kpi-wrapper" style="background-color: #dbeafe; color: #2563eb;"><i class="fas fa-sign-in-alt fa-lg"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stage-card" data-stage="yard" role="button" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-1">Pending Yardman</small>
+                            <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
+                            <small class="stage-overdue text-muted">Target &le; <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit</small>
+                        </div>
+                        <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;"><i class="fas fa-hard-hat fa-lg"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stage-card" data-stage="gate_out" role="button" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-1">Pending Gate Out</small>
+                            <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
+                            <small class="stage-overdue text-muted">Target &le; <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit</small>
+                        </div>
+                        <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #16a34a;"><i class="fas fa-sign-out-alt fa-lg"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content -->
         <div class="row g-4">
             <!-- Live Antrean (SLA Monitor) -->
             <div class="col-lg-8">
                 <div class="card-section">
-                    <h5 class="fw-bold mb-4" style="color: #0f172a;">Live Antrean (SLA Monitor)</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="fw-bold mb-0" style="color: #0f172a;">Live Antrean (SLA Monitor)</h5>
+                        <span id="stageFilterBadge" class="badge bg-primary rounded-pill px-3 py-2" role="button" style="display:none;"></span>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-custom border-0">
                             <thead>
@@ -111,20 +159,12 @@
                                     <th>Queue No.</th>
                                     <th>License Plate</th>
                                     <th>Status</th>
+                                    <th>Di Tahap Ini</th>
                                     <th>Elapsed Time</th>
                                     <th>Estimated Call</th>
                                 </tr>
                             </thead>
                             <tbody id="queueTableBody">
-                                <?php foreach($queues as $q): ?>
-                                <tr>
-                                    <td class="fw-bold"><?= html_escape($q['queue_number']); ?></td>
-                                    <td class="fw-semibold"><?= html_escape($q['license_plate']); ?></td>
-                                    <td><span class="badge badge-pill-status <?= $q['badge_class']; ?>"><?= html_escape($q['status_label']); ?></span></td>
-                                    <td><?= $q['elapsed_minutes']; ?> Menit</td>
-                                    <td><?= $q['estimated_call'] === NULL ? '-' : $q['estimated_call'] . ' Menit'; ?></td>
-                                </tr>
-                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -256,19 +296,70 @@
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
         }
 
+        const STAGE_KPI = <?= MY_Controller::STAGE_KPI_MINUTES; ?>;
+        const STAGE_TITLES = { gate_in: 'Pending Gate In', yard: 'Pending Yardman', gate_out: 'Pending Gate Out' };
+        let activeStage = null;
+        let lastQueues = [];
+
+        function renderStageCards(queues) {
+            $.each(STAGE_TITLES, function(stage) {
+                let rows = queues.filter(function(q) { return q.stage === stage; });
+                let late = rows.filter(function(q) { return q.stage_overdue; }).length;
+                let card = $('.stage-card[data-stage="' + stage + '"]');
+                card.find('.stage-count').text(rows.length);
+                card.toggleClass('has-overdue', late > 0);
+                if (stage !== 'gate_in') {
+                    card.find('.stage-overdue')
+                        .toggleClass('stage-late', late > 0)
+                        .text(late > 0 ? late + ' truk lewat ' + STAGE_KPI + ' menit!' : 'Semua dalam target \u2264 ' + STAGE_KPI + ' menit');
+                }
+            });
+        }
+
         function renderQueues(queues) {
+            lastQueues = queues;
+            renderStageCards(queues);
+
+            let rows = activeStage ? queues.filter(function(q) { return q.stage === activeStage; }) : queues;
+            if (activeStage) {
+                // Detail pending: yang paling lama menunggu di tahap ini ditaruh paling atas
+                rows = rows.slice().sort(function(a, b) { return b.stage_minutes - a.stage_minutes; });
+            }
+
             let html = '';
-            queues.forEach(function(q) {
+            rows.forEach(function(q) {
                 html += '<tr>' +
                     '<td class="fw-bold">' + esc(q.queue_number) + '</td>' +
                     '<td class="fw-semibold">' + esc(q.license_plate) + '</td>' +
                     '<td><span class="badge badge-pill-status ' + esc(q.badge_class) + '">' + esc(q.status_label) + '</span></td>' +
+                    '<td><span class="badge ' + (q.stage_overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(q.stage_minutes) + ' mnt</span></td>' +
                     '<td>' + esc(q.elapsed_minutes) + ' Menit</td>' +
                     '<td>' + (q.estimated_call === null ? '-' : esc(q.estimated_call) + ' Menit') + '</td>' +
                 '</tr>';
             });
+            if (!rows.length) {
+                html = '<tr><td colspan="6" class="text-center text-muted py-4">' + (activeStage ? 'Tidak ada antrean pending di tahap ini.' : 'Tidak ada antrean aktif.') + '</td></tr>';
+            }
             $('#queueTableBody').html(html);
         }
+
+        function setStageFilter(stage) {
+            activeStage = (activeStage === stage) ? null : stage;
+            $('.stage-card').removeClass('active');
+            if (activeStage) {
+                $('.stage-card[data-stage="' + activeStage + '"]').addClass('active');
+                $('#stageFilterBadge').text('Filter: ' + STAGE_TITLES[activeStage] + '  \u2715').show();
+            } else {
+                $('#stageFilterBadge').hide();
+            }
+            renderQueues(lastQueues);
+        }
+
+        $('.stage-card').on('click', function() { setStageFilter($(this).data('stage')); });
+        $('.stage-card').on('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStageFilter($(this).data('stage')); } });
+        $('#stageFilterBadge').on('click', function() { setStageFilter(activeStage); });
+
+        renderQueues(<?= json_encode($queues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 
         function renderHeatmap(heatmap) {
             let html = '';
@@ -391,8 +482,6 @@
                     renderHeatmap(data.heatmap);
                     renderSos(data.sos_reports);
                     showSosAlert(data.sos_reports);
-                    $('#kpiPendingYard').text(data.kpi.pending_yard);
-                    $('#kpiPendingGateOut').text(data.kpi.pending_gate_out);
                 },
                 error: function(xhr) {
                     if (xhr.status === 401) window.location.reload();

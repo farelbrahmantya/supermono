@@ -90,20 +90,28 @@ class Control_tower extends MY_Controller {
             CASE WHEN q.status = 'WAITING_GATE'
                  THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
                  ELSE TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
-            END AS elapsed_minutes
+            END AS elapsed_minutes,
+            CASE q.status
+                 WHEN 'WAITING_GATE' THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
+                 WHEN 'IN_YARD'      THEN TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
+                 ELSE TIMESTAMPDIFF(MINUTE, q.yard_scan_at, ?)
+            END AS stage_minutes
             FROM queue_transactions q
             LEFT JOIN yard_zones z ON z.id = q.current_zone_id
             WHERE q.status IN ('IN_YARD', 'AT_YARD')
                OR (q.status = 'WAITING_GATE' AND q.created_at >= ?)
             ORDER BY q.id ASC
-        ", array($now, $now, $this->_expiry_cutoff()))->result();
+        ", array($now, $now, $now, $now, $now, $this->_expiry_cutoff()))->result();
 
         $rate     = $this->_minutes_per_gate_in();
         $position = 0;
         $queues   = array();
 
+        $stages = array('WAITING_GATE' => 'gate_in', 'IN_YARD' => 'yard', 'AT_YARD' => 'gate_out');
+
         foreach ($rows as $q) {
-            $elapsed  = max(0, (int) $q->elapsed_minutes);
+            $elapsed       = max(0, (int) $q->elapsed_minutes);
+            $stage_minutes = max(0, (int) $q->stage_minutes);
             $over_sla = $q->status !== 'WAITING_GATE' && $elapsed > (int) $q->sla_target_minutes;
             $estimated_call = NULL;
 
@@ -115,10 +123,10 @@ class Control_tower extends MY_Controller {
                     $estimated_call = (int) round(($position - 1) * $rate);
                 }
             } elseif ($q->status === 'IN_YARD') {
-                $label = 'Gate In / Menuju Yard';
+                $label = 'Menunggu Yardman';
                 $badge = 'badge-yard';
             } else {
-                $label = $q->zone_code ? 'Di Yard (Blok ' . $q->zone_code . ')' : 'Di Yard';
+                $label = 'Menunggu Gate Out' . ($q->zone_code ? ' (Blok ' . $q->zone_code . ')' : '');
                 $badge = 'badge-yard';
             }
 
@@ -133,7 +141,11 @@ class Control_tower extends MY_Controller {
                 'status_label'    => $label,
                 'badge_class'     => $badge,
                 'elapsed_minutes' => $elapsed,
-                'estimated_call'  => $estimated_call
+                'estimated_call'  => $estimated_call,
+                // Tahap yang sedang ditunggu & lama menunggu di tahap itu (KPI per tahap di dalam depo)
+                'stage'           => $stages[$q->status],
+                'stage_minutes'   => $stage_minutes,
+                'stage_overdue'   => $q->status !== 'WAITING_GATE' && $stage_minutes > self::STAGE_KPI_MINUTES
             );
         }
 
