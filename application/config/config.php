@@ -403,7 +403,9 @@ $config['sess_regenerate_destroy'] = FALSE;
 $config['cookie_prefix']	= '';
 $config['cookie_domain']	= '';
 $config['cookie_path']		= '/';
-$config['cookie_secure']	= TRUE;
+// FALSE: di balik proxy/port 9500 server tidak mendeteksi HTTPS, sehingga CI tidak
+// membuat cookie CSRF dan semua form login ditolak ("The action you have requested is not allowed")
+$config['cookie_secure']	= FALSE;
 $config['cookie_httponly'] 	= TRUE;
 
 /*
