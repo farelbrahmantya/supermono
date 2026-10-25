@@ -91,7 +91,7 @@
                     <h5 class="modal-title fw-bold"><i class="fas fa-bullhorn me-2"></i> Lapor Pungli / Penyerobotan</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form action="<?= base_url('driver/submit_sos'); ?>" method="POST" enctype="multipart/form-data">
+                <form action="<?= base_url('driver/submit_sos'); ?>" method="POST" enctype="multipart/form-data" data-csrf-refresh>
                     <div class="modal-body text-dark">
                         <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                         
@@ -128,6 +128,31 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        // Ambil token CSRF terbaru tepat sebelum form dikirim
+        (function() {
+            var tokenUrl = "<?= base_url('auth/csrf_token'); ?>";
+            var forms = document.querySelectorAll('form[data-csrf-refresh]');
+            for (var i = 0; i < forms.length; i++) {
+                forms[i].addEventListener('submit', function(e) {
+                    var form = this;
+                    e.preventDefault();
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', tokenUrl + '?_=' + Date.now(), true);
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    xhr.onloadend = function() {
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            var input = form.querySelector('input[name="' + res.name + '"]');
+                            if (input) input.value = res.hash;
+                        } catch (err) {}
+                        form.submit();
+                    };
+                    xhr.send();
+                });
+            }
+        })();
+    </script>
     <script>
         // QR dibuat di browser, nomor antrean tidak dikirim ke layanan pihak ketiga
         new QRCode(document.getElementById("queueQr"), { text: $('#queueQr').data('code'), width: 160, height: 160 });

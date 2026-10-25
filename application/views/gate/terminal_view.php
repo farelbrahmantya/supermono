@@ -289,7 +289,14 @@
 
     <script>
         const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
-        const CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+        let CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+
+        // Token di halaman bisa basi: ambil token baru lalu ulangi request sekali
+        function refreshCsrf(done) {
+            $.ajax({ url: "<?= base_url('auth/csrf_token'); ?>", data: { _: Date.now() }, dataType: "json" })
+                .done(function(res) { CSRF_HASH = res.hash; done(true); })
+                .fail(function() { done(false); });
+        }
 
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
@@ -315,7 +322,7 @@
             }
         });
 
-        function sendGateScan(code) {
+        function sendGateScan(code, retried) {
             $.ajax({
                 url: "<?= base_url('gate/process_scan'); ?>",
                 type: "POST",
@@ -340,6 +347,10 @@
                     }, 4000);
                 },
                 error: function(xhr) {
+                    if (xhr.status === 403 && !retried) {
+                        refreshCsrf(function(ok) { if (ok) sendGateScan(code, true); });
+                        return;
+                    }
                     let msg = xhr.status === 401 || xhr.status === 403
                         ? 'Sesi berakhir. Halaman dimuat ulang...'
                         : 'Gagal terhubung ke server. Scan ulang barcode.';

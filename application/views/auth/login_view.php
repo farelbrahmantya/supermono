@@ -151,7 +151,7 @@
                         </div>
                     <?php endif; ?>
 
-                    <form action="<?= base_url('auth/process_login_driver'); ?>" method="POST">
+                    <form action="<?= base_url('auth/process_login_driver'); ?>" method="POST" data-csrf-refresh>
                         <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                         <div class="mb-3">
                             <label class="form-label form-label-custom">Nomor Handphone (Kitir)</label>
@@ -183,7 +183,7 @@
                         </div>
                     <?php endif; ?>
 
-                    <form action="<?= base_url('auth/process_login_staff'); ?>" method="POST">
+                    <form action="<?= base_url('auth/process_login_staff'); ?>" method="POST" data-csrf-refresh>
                         <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                         <div class="mb-3">
                             <label class="form-label form-label-custom">Username</label>
@@ -215,5 +215,30 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Ambil token CSRF terbaru tepat sebelum form dikirim
+        (function() {
+            var tokenUrl = "<?= base_url('auth/csrf_token'); ?>";
+            var forms = document.querySelectorAll('form[data-csrf-refresh]');
+            for (var i = 0; i < forms.length; i++) {
+                forms[i].addEventListener('submit', function(e) {
+                    var form = this;
+                    e.preventDefault();
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', tokenUrl + '?_=' + Date.now(), true);
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    xhr.onloadend = function() {
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            var input = form.querySelector('input[name="' + res.name + '"]');
+                            if (input) input.value = res.hash;
+                        } catch (err) {}
+                        form.submit();
+                    };
+                    xhr.send();
+                });
+            }
+        })();
+    </script>
 </body>
 </html>

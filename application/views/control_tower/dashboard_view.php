@@ -214,7 +214,14 @@
     <script>
         const MEDIA_BASE = "<?= base_url(); ?>";
         const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
-        const CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+        let CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+
+        // Token di halaman bisa basi: ambil token baru lalu ulangi request sekali
+        function refreshCsrf(done) {
+            $.ajax({ url: "<?= base_url('auth/csrf_token'); ?>", data: { _: Date.now() }, dataType: "json" })
+                .done(function(res) { CSRF_HASH = res.hash; done(true); })
+                .fail(function() { done(false); });
+        }
 
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
@@ -267,9 +274,7 @@
             $('#sosCount').text(openCount);
         }
 
-        $(document).on('click', '.btn-resolve-sos', function() {
-            let btn = $(this);
-            btn.prop('disabled', true);
+        function resolveSos(btn, retried) {
             $.ajax({
                 url: "<?= base_url('control_tower/resolve_sos'); ?>",
                 type: "POST",
@@ -281,10 +286,20 @@
                     $('#sosCount').text(Math.max(0, open - 1));
                 },
                 error: function(xhr) {
+                    if (xhr.status === 403 && !retried) {
+                        refreshCsrf(function(ok) { ok ? resolveSos(btn, true) : btn.prop('disabled', false); });
+                        return;
+                    }
                     if (xhr.status === 401 || xhr.status === 403) window.location.reload();
                     btn.prop('disabled', false);
                 }
             });
+        }
+
+        $(document).on('click', '.btn-resolve-sos', function() {
+            let btn = $(this);
+            btn.prop('disabled', true);
+            resolveSos(btn, false);
         });
 
         setInterval(function() {

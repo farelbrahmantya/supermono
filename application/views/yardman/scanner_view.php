@@ -110,7 +110,14 @@
 
     <script>
         const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
-        const CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+        let CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+
+        // Token di halaman bisa basi: ambil token baru lalu ulangi request sekali
+        function refreshCsrf(done) {
+            $.ajax({ url: "<?= base_url('auth/csrf_token'); ?>", data: { _: Date.now() }, dataType: "json" })
+                .done(function(res) { CSRF_HASH = res.hash; done(true); })
+                .fail(function() { done(false); });
+        }
 
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
@@ -143,12 +150,12 @@
             }
         }
 
-        function sendScanData(queueNumber) {
+        function sendScanData(queueNumber, retried) {
             if (isProcessing) return;
 
             // Abaikan QR yang sama selama 10 detik (kamera terus membaca QR yang masih di dalam bingkai)
             let nowMs = Date.now();
-            if (queueNumber === lastScanCode && nowMs - lastScanTime < 10000) return;
+            if (!retried && queueNumber === lastScanCode && nowMs - lastScanTime < 10000) return;
             lastScanCode = queueNumber;
             lastScanTime = nowMs;
 
@@ -189,6 +196,11 @@
                     }, 3500);
                 },
                 error: function(xhr) {
+                    if (xhr.status === 403 && !retried) {
+                        isProcessing = false;
+                        refreshCsrf(function(ok) { if (ok) sendScanData(queueNumber, true); });
+                        return;
+                    }
                     if (xhr.status === 401 || xhr.status === 403) {
                         window.location.reload();
                         return;

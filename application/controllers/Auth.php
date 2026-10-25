@@ -115,6 +115,15 @@ class Auth extends MY_Controller {
         redirect('driver');
     }
 
+    // Token CSRF terbaru untuk form/AJAX: token yang tertanam di halaman bisa basi
+    // jika cookie CSRF berubah setelah halaman dimuat (misalnya oleh proxy/CDN)
+    public function csrf_token() {
+        $this->_json(array(
+            'name' => $this->security->get_csrf_token_name(),
+            'hash' => $this->security->get_csrf_hash()
+        ));
+    }
+
     // Logout Semuanya
     public function logout() {
         $this->session->sess_destroy();
