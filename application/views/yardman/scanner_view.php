@@ -6,7 +6,7 @@
     <title>LASMONO - Yardman Scanner</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         :root { --primary-dark: #0b1e38; --accent-blue: #2563eb; --accent-green: #10b981; }
@@ -56,6 +56,19 @@
             <!-- Alert Notifikasi Toast -->
             <div id="scanResult" style="display:none;" class="alert border-0 shadow-sm mb-3"></div>
 
+            <!-- Pilih Blok Yard (disimpan untuk heatmap kepadatan) -->
+            <?php if (!empty($zones)): ?>
+            <div class="card-custom p-3 mb-3">
+                <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-th me-1"></i> BLOK YARD PENEMPATAN</span>
+                <select id="zoneSelect" class="form-select fw-bold">
+                    <option value="">-- Pilih Blok Yard --</option>
+                    <?php foreach ($zones as $zone): ?>
+                        <option value="<?= html_escape($zone->zone_code); ?>"><?= html_escape($zone->zone_code); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+
             <!-- Card Scanner Utama -->
             <div class="card-custom p-3 mb-3">
                 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -96,7 +109,16 @@
     </div>
 
     <script>
+        const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
+        const CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+
+        function esc(value) {
+            return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
+        }
+
         let isProcessing = false;
+        let lastScanCode = '';
+        let lastScanTime = 0;
         let html5QrCode = null;
 
         // Inisialisasi Audio Beep Bawaan Browser (Web Audio API)
@@ -123,6 +145,13 @@
 
         function sendScanData(queueNumber) {
             if (isProcessing) return;
+
+            // Abaikan QR yang sama selama 10 detik (kamera terus membaca QR yang masih di dalam bingkai)
+            let nowMs = Date.now();
+            if (queueNumber === lastScanCode && nowMs - lastScanTime < 10000) return;
+            lastScanCode = queueNumber;
+            lastScanTime = nowMs;
+
             isProcessing = true;
 
             playBeepSound();
@@ -133,7 +162,7 @@
             $.ajax({
                 url: "<?= base_url('yardman/process_scan'); ?>",
                 type: "POST",
-                data: { queue_number: queueNumber },
+                data: { queue_number: queueNumber, zone_code: $('#zoneSelect').val() || '', [CSRF_NAME]: CSRF_HASH },
                 dataType: "json",
                 success: function(res) {
                     let alertClass = res.status === 'success' ? 'alert-success text-success' : (res.status === 'warning' ? 'alert-warning text-dark' : 'alert-danger text-danger');
@@ -142,11 +171,16 @@
                     $('#scanResult')
                         .removeClass('alert-success alert-warning alert-danger text-success text-dark text-danger')
                         .addClass(alertClass)
-                        .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + res.message.replace(/\n/g, "<br>") + '</b>')
+                        .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + esc(res.message).replace(/\n/g, "<br>") + '</b>')
                         .fadeIn();
 
                     if (res.status === 'success') {
                         addRecentScan(queueNumber, res.message);
+                    }
+
+                    // Error (misal blok yard belum dipilih) boleh langsung discan ulang
+                    if (res.status === 'error') {
+                        lastScanCode = '';
                     }
 
                     setTimeout(function() {
@@ -154,7 +188,17 @@
                         $('#scanStatusBadge').removeClass('bg-warning-subtle text-warning').addClass('bg-success-subtle text-success').text('Kamera Aktif');
                     }, 3500);
                 },
-                error: function() {
+                error: function(xhr) {
+                    if (xhr.status === 401 || xhr.status === 403) {
+                        window.location.reload();
+                        return;
+                    }
+                    lastScanCode = '';
+                    $('#scanResult')
+                        .removeClass('alert-success alert-warning text-success text-dark')
+                        .addClass('alert-danger text-danger')
+                        .text('Gagal terhubung ke server. Scan ulang barcode.')
+                        .fadeIn();
                     isProcessing = false;
                     $('#scanStatusBadge').removeClass('bg-warning-subtle text-warning').addClass('bg-success-subtle text-success').text('Kamera Aktif');
                 }
@@ -169,8 +213,8 @@
             let itemHtml = `
                 <div class="recent-item">
                     <div>
-                        <div class="fw-bold text-dark mb-0">${code}</div>
-                        <small class="text-muted" style="font-size: 11px;">${msg.split('\n')[0]}</small>
+                        <div class="fw-bold text-dark mb-0">${esc(code)}</div>
+                        <small class="text-muted" style="font-size: 11px;">${esc(msg.split('\n')[0])}</small>
                     </div>
                     <span class="badge bg-light text-dark border">${timeStr}</span>
                 </div>
@@ -204,4 +248,4 @@
         });
     </script>
 </body>
-</html>
+</html>

@@ -39,7 +39,7 @@
                 <i class="fas fa-bell me-1"></i> SOS (<span id="sosCount"><?= count($sos_reports); ?></span>)
             </button>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-warning btn-sm me-3 fw-bold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
-            <span class="me-3 text-light opacity-75 small">Admin: Supervisor</span>
+            <span class="me-3 text-light opacity-75 small">Admin: <?= html_escape($admin_name); ?></span>
             <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i></a>
         </div>
     </div>
@@ -53,6 +53,7 @@
                     <div>
                         <small class="text-muted d-block mb-1">Rata-rata TAT (Turn Around Time)</small>
                         <h2 class="fw-bold mb-0" style="color: #1e293b;"><span id="kpiTat"><?= $kpi['avg_tat']; ?></span> Menit</h2>
+                        <small class="text-muted" id="kpiTatDetail">Antre <?= $kpi['avg_wait']; ?> mnt &middot; Layanan <?= $kpi['avg_service']; ?> mnt &middot; <?= $kpi['completed_today']; ?> truk selesai</small>
                     </div>
                     <div class="icon-kpi-wrapper" style="background-color: #ffedd5; color: #ea580c;">
                         <i class="fas fa-stopwatch fa-lg"></i>
@@ -64,6 +65,7 @@
                     <div>
                         <small class="text-muted d-block mb-1">Truk Antre (Luar)</small>
                         <h2 class="fw-bold mb-0" style="color: #1e293b;" id="kpiWaiting"><?= $kpi['truck_waiting']; ?></h2>
+                        <small class="text-muted"><span id="kpiExpired"><?= $kpi['truck_expired']; ?></span> antrean kedaluwarsa</small>
                     </div>
                     <div class="icon-kpi-wrapper" style="background-color: #dbeafe; color: #2563eb;">
                         <i class="fas fa-truck fa-lg"></i>
@@ -84,8 +86,8 @@
             <div class="col-md-3">
                 <div class="card-kpi d-flex align-items-center justify-content-between">
                     <div>
-                        <small class="text-muted d-block mb-1">Gate In Aktif</small>
-                        <h2 class="fw-bold mb-0" style="color: #1e293b;"><?= $kpi['gate_active']; ?></h2>
+                        <small class="text-muted d-block mb-1">Gate In (1 Jam Terakhir)</small>
+                        <h2 class="fw-bold mb-0" style="color: #1e293b;"><span id="kpiGateIn"><?= $kpi['gate_in_last_hour']; ?></span> Truk</h2>
                     </div>
                     <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #16a34a;">
                         <i class="fas fa-door-open fa-lg"></i>
@@ -114,19 +116,11 @@
                             <tbody id="queueTableBody">
                                 <?php foreach($queues as $q): ?>
                                 <tr>
-                                    <td class="fw-bold"><?= $q->queue_number; ?></td>
-                                    <td class="fw-semibold"><?= $q->license_plate; ?></td>
-                                    <td>
-                                        <?php if($q->status == 'IN_YARD'): ?>
-                                            <span class="badge badge-pill-status badge-yard">Di Yard (Blok B)</span>
-                                        <?php elseif($q->status == 'IN_YARD' && $q->elapsed_minutes > 15): ?>
-                                            <span class="badge badge-pill-status badge-over-sla">Over SLA</span>
-                                        <?php else: ?>
-                                            <span class="badge badge-pill-status badge-waiting">Menunggu Gate</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?= $q->elapsed_minutes ? $q->elapsed_minutes : 0; ?> Menit</td>
-                                    <td>15 Menit</td>
+                                    <td class="fw-bold"><?= html_escape($q['queue_number']); ?></td>
+                                    <td class="fw-semibold"><?= html_escape($q['license_plate']); ?></td>
+                                    <td><span class="badge badge-pill-status <?= $q['badge_class']; ?>"><?= html_escape($q['status_label']); ?></span></td>
+                                    <td><?= $q['elapsed_minutes']; ?> Menit</td>
+                                    <td><?= $q['estimated_call'] === NULL ? '-' : $q['estimated_call'] . ' Menit'; ?></td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -139,9 +133,9 @@
             <div class="col-lg-4">
                 <div class="card-section">
                     <h5 class="fw-bold mb-4" style="color: #0f172a;">Kepadatan Yard</h5>
-                    <div class="grid-density mb-3">
+                    <div class="grid-density mb-3" id="heatmapGrid">
                         <?php foreach($heatmap as $code => $info): ?>
-                            <div class="density-box density-<?= $info['level']; ?>">
+                            <div class="density-box density-<?= $info['level']; ?>" title="<?= $info['count']; ?> truk">
                                 <?= $code; ?>
                             </div>
                         <?php endforeach; ?>
@@ -176,19 +170,20 @@
                                 <th>Nopol</th>
                                 <th>Jenis</th>
                                 <th>Deskripsi</th>
+                                <th>Bukti</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="sosTableBody">
                             <?php foreach($sos_reports as $sos): ?>
                             <tr>
-                                <td><small><?= $sos->created_at; ?></small></td>
-                                <td><b>#<?= $sos->queue_number; ?></b></td>
-                                <td><?= $sos->license_plate; ?></td>
-                                <td><span class="badge bg-danger"><?= $sos->report_type; ?></span></td>
-                                <td><?= $sos->description; ?></td>
+                                <td><small><?= html_escape($sos->created_at); ?></small></td>
+                                <td><b>#<?= html_escape($sos->queue_number); ?></b></td>
+                                <td><?= html_escape($sos->license_plate); ?></td>
+                                <td><span class="badge bg-danger"><?= html_escape($sos->report_type); ?></span></td>
+                                <td><?= html_escape($sos->description); ?></td>
                                 <td>
                                     <?php if(!empty($sos->media_path)): ?>
-                                        <a href="<?= base_url($sos->media_path); ?>" target="_blank" class="btn btn-sm btn-outline-danger fw-bold py-0">
+                                        <a href="<?= html_escape(base_url($sos->media_path)); ?>" rel="noopener" target="_blank" class="btn btn-sm btn-outline-danger fw-bold py-0">
                                             <i class="fas fa-paperclip me-1"></i> Lihat Bukti
                                         </a>
                                     <?php else: ?>
@@ -206,6 +201,52 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const MEDIA_BASE = "<?= base_url(); ?>";
+
+        function esc(value) {
+            return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
+        }
+
+        function renderQueues(queues) {
+            let html = '';
+            queues.forEach(function(q) {
+                html += '<tr>' +
+                    '<td class="fw-bold">' + esc(q.queue_number) + '</td>' +
+                    '<td class="fw-semibold">' + esc(q.license_plate) + '</td>' +
+                    '<td><span class="badge badge-pill-status ' + esc(q.badge_class) + '">' + esc(q.status_label) + '</span></td>' +
+                    '<td>' + esc(q.elapsed_minutes) + ' Menit</td>' +
+                    '<td>' + (q.estimated_call === null ? '-' : esc(q.estimated_call) + ' Menit') + '</td>' +
+                '</tr>';
+            });
+            $('#queueTableBody').html(html);
+        }
+
+        function renderHeatmap(heatmap) {
+            let html = '';
+            $.each(heatmap, function(code, info) {
+                html += '<div class="density-box density-' + esc(info.level) + '" title="' + esc(info.count) + ' truk">' + esc(code) + '</div>';
+            });
+            $('#heatmapGrid').html(html);
+        }
+
+        function renderSos(reports) {
+            let html = '';
+            reports.forEach(function(sos) {
+                let media = sos.media_path
+                    ? '<a href="' + esc(MEDIA_BASE + sos.media_path) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger fw-bold py-0"><i class="fas fa-paperclip me-1"></i> Lihat Bukti</a>'
+                    : '<span class="text-muted small">- Tidak ada -</span>';
+                html += '<tr>' +
+                    '<td><small>' + esc(sos.created_at) + '</small></td>' +
+                    '<td><b>#' + esc(sos.queue_number) + '</b></td>' +
+                    '<td>' + esc(sos.license_plate) + '</td>' +
+                    '<td><span class="badge bg-danger">' + esc(sos.report_type) + '</span></td>' +
+                    '<td>' + esc(sos.description) + '</td>' +
+                    '<td>' + media + '</td>' +
+                '</tr>';
+            });
+            $('#sosTableBody').html(html);
+        }
+
         setInterval(function() {
             $.ajax({
                 url: "<?= base_url('control_tower/get_live_data'); ?>",
@@ -213,12 +254,21 @@
                 dataType: "json",
                 success: function(data) {
                     $('#kpiTat').text(data.kpi.avg_tat);
+                    $('#kpiTatDetail').text('Antre ' + data.kpi.avg_wait + ' mnt \u00b7 Layanan ' + data.kpi.avg_service + ' mnt \u00b7 ' + data.kpi.completed_today + ' truk selesai');
                     $('#kpiWaiting').text(data.kpi.truck_waiting);
+                    $('#kpiExpired').text(data.kpi.truck_expired);
                     $('#kpiInYard').text(data.kpi.truck_in_yard);
+                    $('#kpiGateIn').text(data.kpi.gate_in_last_hour);
                     $('#sosCount').text(data.sos_reports.length);
+                    renderQueues(data.queues);
+                    renderHeatmap(data.heatmap);
+                    renderSos(data.sos_reports);
+                },
+                error: function(xhr) {
+                    if (xhr.status === 401) window.location.reload();
                 }
             });
         }, 5000);
     </script>
 </body>
-</html>
+</html>

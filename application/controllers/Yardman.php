@@ -1,82 +1,91 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Yardman extends CI_Controller {
+class Yardman extends MY_Controller {
+
+    protected $allowed_roles = array('YARDMAN', 'CONTROL_TOWER');
 
     public function __construct() {
         parent::__construct();
         $this->load->database();
         $this->load->library('session');
         $this->load->helper('url');
-
-        if (!in_array($this->session->userdata('role'), array('YARDMAN', 'CONTROL_TOWER'))) {
-            redirect('auth');
-        }
     }
 
     public function index() {
-        $this->load->view('yardman/scanner_view');
+        $data['zones'] = $this->db->order_by('zone_code', 'ASC')->get('yard_zones')->result();
+        $this->load->view('yardman/scanner_view', $data);
     }
 
-    // API Pemrosesan Scan Barcode 3 Tahapan + Anti Double Scan
+    // API Pemrosesan Scan Barcode Yardman (IN_YARD -> AT_YARD) + Anti Double Scan
+    // Gate In & Gate Out hanya boleh dilakukan Security di halaman Gate.
     public function process_scan() {
-        $queue_number = trim($this->input->post('queue_number'));
-        $zone_code    = trim($this->input->post('zone_code')); // Opsional untuk lokasi blok
+        $queue_number = strtoupper(trim((string) $this->input->post('queue_number')));
+        $zone_code    = strtoupper(trim((string) $this->input->post('zone_code')));
         $user_id      = $this->session->userdata('user_id');
 
         $queue = $this->db->get_where('queue_transactions', array('queue_number' => $queue_number))->row();
 
         if (!$queue) {
-            echo json_encode(array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue_number . ' tidak ditemukan!'));
+            $this->_json(array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue_number . ' tidak ditemukan!'));
             return;
         }
 
-        $now = date('Y-m-d H:i:s');
-
-        // TAHAP 1: GATE IN SCAN (Memulai SLA)
         if ($queue->status == 'WAITING_GATE') {
-            $update = array(
-                'status'     => 'IN_YARD',
-                'gate_in_at' => $now,
-                'gate_in_by' => $user_id
-            );
-            $this->db->where('id', $queue->id)->update('queue_transactions', $update);
-            echo json_encode(array(
-                'status'  => 'success', 
-                'message' => "TAHAP 1 (GATE IN) BERHASIL!\nTruk {$queue->license_plate} resmi masuk area depo. SLA Dimulai."
+            $this->_json(array(
+                'status'  => 'warning',
+                'message' => "Truk {$queue->license_plate} BELUM Gate In.\nTruk wajib discan Security di Gate In terlebih dahulu."
             ));
-
-        // TAHAP 2: YARD AREA SCAN (Aktivitas Bongkar/Muat di Blok Yard)
-        } elseif ($queue->status == 'IN_YARD') {
-            $update = array(
-                'status'       => 'AT_YARD',
-                'yard_scan_at' => $now,
-                'yard_scan_by' => $user_id
-            );
-            $this->db->where('id', $queue->id)->update('queue_transactions', $update);
-            echo json_encode(array(
-                'status'  => 'success', 
-                'message' => "TAHAP 2 (SERVIS YARD) BERHASIL!\nTruk {$queue->license_plate} terkonfirmasi melayani di Blok Yard."
-            ));
-
-        // TAHAP 3: GATE OUT SCAN (Penyelesaian Servis & Stop TAT)
-        } elseif ($queue->status == 'AT_YARD') {
-            $update = array(
-                'status'      => 'COMPLETED',
-                'gate_out_at' => $now,
-                'gate_out_by' => $user_id
-            );
-            $this->db->where('id', $queue->id)->update('queue_transactions', $update);
-            echo json_encode(array(
-                'status'  => 'success', 
-                'message' => "TAHAP 3 (GATE OUT) BERHASIL!\nServis Truk {$queue->license_plate} Selesai & Siap Keluar Depo."
-            ));
-
-        } else {
-            echo json_encode(array(
-                'status'  => 'warning', 
-                'message' => "Antrean {$queue->queue_number} sudah berstatus COMPLETED."
-            ));
+            return;
         }
+
+        if ($queue->status == 'AT_YARD') {
+            $this->_json(array(
+                'status'  => 'warning',
+                'message' => "Antrean {$queue->queue_number} sudah diverifikasi Yardman pada {$queue->yard_scan_at}.\nSelanjutnya scan di Gate Out."
+            ));
+            return;
+        }
+
+        if ($queue->status != 'IN_YARD') {
+            $this->_json(array(
+                'status'  => 'warning',
+                'message' => "Antrean {$queue->queue_number} sudah berstatus {$queue->status}."
+            ));
+            return;
+        }
+
+        // Blok yard wajib dipilih (jika master yard_zones terisi) agar heatmap kepadatan akurat
+        $zone = NULL;
+        if ($zone_code !== '') {
+            $zone = $this->db->get_where('yard_zones', array('zone_code' => $zone_code))->row();
+            if (!$zone) {
+                $this->_json(array('status' => 'error', 'message' => "Blok yard {$zone_code} tidak terdaftar!"));
+                return;
+            }
+        } elseif ($this->db->count_all('yard_zones') > 0) {
+            $this->_json(array('status' => 'error', 'message' => 'Pilih Blok Yard terlebih dahulu sebelum scan!'));
+            return;
+        }
+
+        $update = array(
+            'status'       => 'AT_YARD',
+            'yard_scan_at' => $this->_now(),
+            'yard_scan_by' => $user_id
+        );
+        if ($zone) {
+            $update['current_zone_id'] = $zone->id;
+        }
+
+        if (!$this->_transition($queue->id, 'IN_YARD', $update)) {
+            $this->_json(array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
+            return;
+        }
+
+        $zone_text = $zone ? " di Blok {$zone->zone_code}" : '';
+        $this->_json(array(
+            'status'  => 'success',
+            'message' => "VERIFIKASI YARD BERHASIL!\nTruk {$queue->license_plate} terkonfirmasi melayani{$zone_text}."
+        ));
     }
 }

@@ -177,7 +177,7 @@
         <div class="d-flex align-items-center gap-3">
             <div class="text-end me-2 d-none d-md-block">
                 <small class="d-block text-muted" style="font-size: 11px;">Petugas Aktif</small>
-                <span class="fw-bold text-light" style="font-size: 14px;"><?= $this->session->userdata('name'); ?></span>
+                <span class="fw-bold text-light" style="font-size: 14px;"><?= html_escape($this->session->userdata('name')); ?></span>
             </div>
             <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold">
                 <i class="fas fa-sign-out-alt me-1"></i> Logout
@@ -288,6 +288,13 @@
     </footer>
 
     <script>
+        const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
+        const CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+
+        function esc(value) {
+            return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
+        }
+
         let processedCount = 0;
 
         // Kunci kursor otomatis agar tidak lepas dari input box
@@ -312,7 +319,7 @@
             $.ajax({
                 url: "<?= base_url('gate/process_scan'); ?>",
                 type: "POST",
-                data: { queue_number: code },
+                data: { queue_number: code, [CSRF_NAME]: CSRF_HASH },
                 dataType: "json",
                 success: function(res) {
                     let alertClass = res.status === 'success' ? 'alert-success text-success' : (res.status === 'warning' ? 'alert-warning text-dark' : 'alert-danger text-danger');
@@ -321,7 +328,7 @@
                     $('#scanResult')
                         .removeClass('alert-success alert-warning alert-danger text-success text-dark text-danger')
                         .addClass(alertClass)
-                        .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + res.message.replace(/\n/g, "<br>") + '</b>')
+                        .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + esc(res.message).replace(/\n/g, "<br>") + '</b>')
                         .fadeIn();
 
                     if (res.status === 'success') {
@@ -331,6 +338,19 @@
                     setTimeout(function() {
                         $('#scanResult').fadeOut();
                     }, 4000);
+                },
+                error: function(xhr) {
+                    let msg = xhr.status === 401 || xhr.status === 403
+                        ? 'Sesi berakhir. Halaman dimuat ulang...'
+                        : 'Gagal terhubung ke server. Scan ulang barcode.';
+                    $('#scanResult')
+                        .removeClass('alert-success alert-warning text-success text-dark')
+                        .addClass('alert-danger text-danger')
+                        .text(msg)
+                        .fadeIn();
+                    if (xhr.status === 401 || xhr.status === 403) {
+                        setTimeout(function() { window.location.reload(); }, 1500);
+                    }
                 }
             });
         }
@@ -348,7 +368,7 @@
             let newRow = `
                 <tr>
                     <td class="text-muted"><small>${timeStr}</small></td>
-                    <td class="fw-bold text-primary">#${code}</td>
+                    <td class="fw-bold text-primary">#${esc(code)}</td>
                     <td>${statusBadge}</td>
                 </tr>
             `;
@@ -361,4 +381,4 @@
         }
     </script>
 </body>
-</html>
+</html>

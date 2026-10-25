@@ -147,11 +147,12 @@
                 <div class="tab-pane fade show active" id="driver-pane" role="tabpanel">
                     <?php if($this->session->flashdata('error_driver')): ?>
                         <div class="alert alert-danger py-2 px-3 small border-0 rounded-3 mb-3">
-                            <i class="fas fa-exclamation-circle me-1"></i> <?= $this->session->flashdata('error_driver'); ?>
+                            <i class="fas fa-exclamation-circle me-1"></i> <?= html_escape($this->session->flashdata('error_driver')); ?>
                         </div>
                     <?php endif; ?>
 
                     <form action="<?= base_url('auth/process_login_driver'); ?>" method="POST">
+                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                         <div class="mb-3">
                             <label class="form-label form-label-custom">Nomor Handphone (Kitir)</label>
                             <div class="input-group">
@@ -178,11 +179,12 @@
                 <div class="tab-pane fade" id="staff-pane" role="tabpanel">
                     <?php if($this->session->flashdata('error_staff')): ?>
                         <div class="alert alert-danger py-2 px-3 small border-0 rounded-3 mb-3">
-                            <i class="fas fa-exclamation-circle me-1"></i> <?= $this->session->flashdata('error_staff'); ?>
+                            <i class="fas fa-exclamation-circle me-1"></i> <?= html_escape($this->session->flashdata('error_staff')); ?>
                         </div>
                     <?php endif; ?>
 
                     <form action="<?= base_url('auth/process_login_staff'); ?>" method="POST">
+                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                         <div class="mb-3">
                             <label class="form-label form-label-custom">Username</label>
                             <div class="input-group">
@@ -214,4 +216,4 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html>
+</html>

@@ -1,64 +1,69 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Driver extends CI_Controller {
+class Driver extends MY_Controller {
+
+    protected $allowed_roles = array('DRIVER');
+
+    private $sos_types = array('PUNGLI', 'PENYEROBOTAN', 'LAINNYA');
+    const SOS_LIMIT_PER_QUEUE = 3;
 
     public function __construct() {
         parent::__construct();
         $this->load->database();
         $this->load->library('session');
         $this->load->helper('url');
-
-        // Mencegah simpanan cache halaman oleh browser
-        $this->output->set_header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0');
-        $this->output->set_header('Pragma: no-cache');
-
-        // Validasi Session Driver
-        if ($this->session->userdata('role') !== 'DRIVER') {
-            redirect('auth');
-        }
     }
 
     public function index() {
-        $phone = $this->session->userdata('driver_phone');
-        $plate = $this->session->userdata('license_plate');
+        $queue = $this->_get_active_queue();
 
-        // Mengambil antrean aktif supir (WAITING_GATE, IN_YARD, atau AT_YARD)
-        $this->db->where('driver_phone', $phone);
-        $this->db->where('license_plate', $plate);
-        $this->db->where_in('status', array('WAITING_GATE', 'IN_YARD', 'AT_YARD'));
-        $this->db->order_by('id', 'DESC');
-        $queue = $this->db->get('queue_transactions')->row();
-
-        // Jika tidak ada antrean aktif (misal sudah COMPLETED), kembalikan ke portal login
+        // Jika tidak ada antrean aktif (sudah COMPLETED / kedaluwarsa), kembalikan ke portal login
         if (!$queue) {
             $this->session->unset_userdata(array('driver_phone', 'license_plate', 'role', 'logged_in'));
+            $this->session->set_flashdata('error_driver', 'Tidak ada antrean aktif (sudah selesai atau kedaluwarsa). Silakan daftar ulang.');
             redirect('auth');
             return;
         }
 
-        // Hitung Posisi Antrean FIFO Hari Ini
-        $this->db->where_in('status', array('WAITING_GATE', 'IN_YARD', 'AT_YARD'));
-        $this->db->where('DATE(created_at)', date('Y-m-d'));
-        $this->db->where('id <=', $queue->id);
-        $queue_position = $this->db->count_all_results('queue_transactions');
-
-        $data['queue']          = $queue;
-        $data['queue_position'] = $queue_position;
+        $data['queue']                 = $queue;
+        $data['queue_position']        = $queue->status === 'WAITING_GATE' ? $this->_queue_position($queue) : NULL;
+        $data['estimated_wait']        = $this->_estimated_wait($data['queue_position']);
+        $data['sla_remaining_seconds'] = $this->_sla_remaining_seconds($queue);
 
         $this->load->view('driver/dashboard_view', $data);
     }
 
     // Submit Laporan SOS dengan Upload Foto/Video Bukti (Maks 10MB)
     public function submit_sos() {
-        $queue_id    = $this->input->post('queue_id');
+        // queue_id diambil dari session, bukan dari form, agar tidak bisa melapor atas nama antrean lain
+        $queue = $this->_get_active_queue();
+        if (!$queue) {
+            redirect('driver');
+            return;
+        }
+
         $report_type = $this->input->post('report_type');
-        $description = $this->input->post('description');
-        $media_path  = NULL;
+        $description = trim((string) $this->input->post('description'));
+
+        if (!in_array($report_type, $this->sos_types, TRUE) || $description === '' || mb_strlen($description) > 1000) {
+            $this->session->set_flashdata('error_sos', 'Jenis pelanggaran dan deskripsi (maks. 1000 karakter) wajib diisi dengan benar.');
+            redirect('driver');
+            return;
+        }
+
+        $sos_count = $this->db->where('queue_id', $queue->id)->count_all_results('sos_reports');
+        if ($sos_count >= self::SOS_LIMIT_PER_QUEUE) {
+            $this->session->set_flashdata('error_sos', 'Batas laporan SOS untuk antrean ini sudah tercapai. Hubungi Control Tower secara langsung.');
+            redirect('driver');
+            return;
+        }
+
+        $media_path = NULL;
 
         // Konfigurasi Upload File CI3
         $config['upload_path']   = './upload/';
-        $config['allowed_types'] = 'jpg|jpeg|png|gif|mp4|avi|mov|mkv';
+        $config['allowed_types'] = 'jpg|jpeg|png|mp4|mov';
         $config['max_size']      = 10240; // Batas 10MB
         $config['encrypt_name']  = TRUE;
 
@@ -76,11 +81,11 @@ class Driver extends CI_Controller {
         }
 
         $data_sos = array(
-            'queue_id'    => $queue_id,
+            'queue_id'    => $queue->id,
             'report_type' => $report_type,
             'description' => $description,
             'media_path'  => $media_path,
-            'created_at'  => date('Y-m-d H:i:s')
+            'created_at'  => $this->_now()
         );
 
         $this->db->insert('sos_reports', $data_sos);
@@ -99,16 +104,28 @@ class Driver extends CI_Controller {
         $queue = $this->db->get('queue_transactions')->row();
 
         if ($queue) {
-            echo json_encode(array(
-                'status'             => 'success',
-                'queue_status'       => $queue->status,
-                'gate_in_at'         => $queue->gate_in_at,
-                'yard_scan_at'       => $queue->yard_scan_at,
-                'gate_out_at'        => $queue->gate_out_at,
-                'sla_target_minutes' => $queue->sla_target_minutes
+            $position = $queue->status === 'WAITING_GATE' ? $this->_queue_position($queue) : NULL;
+            $this->_json(array(
+                'status'                => 'success',
+                'queue_status'          => $this->_is_expired($queue) ? 'EXPIRED' : $queue->status,
+                'queue_position'        => $position,
+                'estimated_wait'        => $this->_estimated_wait($position),
+                'sla_remaining_seconds' => $this->_sla_remaining_seconds($queue),
+                'sla_target_minutes'    => $queue->sla_target_minutes
             ));
         } else {
-            echo json_encode(array('status' => 'not_found'));
+            $this->_json(array('status' => 'not_found'));
         }
+    }
+
+    // Antrean aktif supir (WAITING_GATE yang belum kedaluwarsa, IN_YARD, atau AT_YARD)
+    private function _get_active_queue() {
+        $this->db->where('driver_phone', $this->session->userdata('driver_phone'));
+        $this->db->where('license_plate', $this->session->userdata('license_plate'));
+        $this->db->where_in('status', array('WAITING_GATE', 'IN_YARD', 'AT_YARD'));
+        $this->db->order_by('id', 'DESC');
+        $queue = $this->db->get('queue_transactions')->row();
+
+        return ($queue && !$this->_is_expired($queue)) ? $queue : NULL;
     }
 }
