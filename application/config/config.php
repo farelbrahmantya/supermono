@@ -452,7 +452,7 @@ $config['global_xss_filtering'] = FALSE;
 */
 $config['csrf_protection'] = TRUE;
 $config['csrf_token_name'] = 'lasmono_csrf_token';
-$config['csrf_cookie_name'] = 'lasmono_csrf';
+$config['csrf_cookie_name'] = 'lasmono_csrf_v2';
 $config['csrf_expire'] = 43200;
 $config['csrf_regenerate'] = FALSE;
 $config['csrf_exclude_uris'] = array();
