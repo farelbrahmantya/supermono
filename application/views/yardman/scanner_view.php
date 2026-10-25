@@ -98,6 +98,15 @@
                 </div>
             </div>
 
+            <!-- Card Antrean Pending: sudah Gate In, belum diverifikasi Yardman -->
+            <div class="card-custom p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold text-secondary small"><i class="fas fa-hourglass-half me-1"></i> PENDING YARDMAN (BELUM DI-SCAN)</span>
+                    <span class="badge bg-warning-subtle text-dark" id="pendingYardCount">0 Truk</span>
+                </div>
+                <div id="pendingYardList"></div>
+            </div>
+
             <!-- Card Riwayat Pindai Terakhir -->
             <div class="card-custom p-3 mb-4">
                 <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-history me-1"></i> RIWAYAT SCAN TERAKHIR</span>
@@ -122,6 +131,33 @@
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
         }
+
+        function loadPending() {
+            $.ajax({
+                url: "<?= base_url('yardman/pending_json'); ?>",
+                data: { _: Date.now() },
+                dataType: "json",
+                success: function(res) {
+                    let rows = res.yard || [];
+                    $('#pendingYardCount').text(rows.length + ' Truk');
+                    if (!rows.length) {
+                        $('#pendingYardList').html('<div class="text-center py-2 text-muted small">Tidak ada antrean pending.</div>');
+                        return;
+                    }
+                    let html = '';
+                    rows.forEach(function(r) {
+                        html += '<div class="recent-item">' +
+                            '<div><div class="fw-bold text-dark mb-0">' + esc(r.queue_number) + '</div>' +
+                            '<small class="text-muted" style="font-size: 11px;">' + esc(r.license_plate) + '</small></div>' +
+                            '<span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span>' +
+                        '</div>';
+                    });
+                    $('#pendingYardList').html(html);
+                }
+            });
+        }
+        loadPending();
+        setInterval(loadPending, 5000);
 
         let isProcessing = false;
         let lastScanCode = '';
@@ -183,6 +219,7 @@
 
                     if (res.status === 'success') {
                         addRecentScan(queueNumber, res.message);
+                        loadPending();
                     }
 
                     // Error (misal blok yard belum dipilih) boleh langsung discan ulang

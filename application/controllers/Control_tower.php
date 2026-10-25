@@ -61,6 +61,10 @@ class Control_tower extends MY_Controller {
             WHERE status = 'COMPLETED' AND gate_out_at >= ?
         ", array(date('Y-m-d 00:00:00')))->row();
 
+        // Antrean per tahap yang belum di-scan
+        $pending_yard     = $this->db->where('status', 'IN_YARD')->count_all_results('queue_transactions');
+        $pending_gate_out = $this->db->where('status', 'AT_YARD')->count_all_results('queue_transactions');
+
         // Throughput Gate In 1 jam terakhir
         $gate_in_last_hour = $this->db->where('gate_in_at >=', date('Y-m-d H:i:s', time() - 3600))
                                       ->count_all_results('queue_transactions');
@@ -73,6 +77,8 @@ class Control_tower extends MY_Controller {
             'truck_waiting'     => $truck_waiting,
             'truck_expired'     => $truck_expired,
             'truck_in_yard'     => $truck_in_yard,
+            'pending_yard'      => $pending_yard,
+            'pending_gate_out'  => $pending_gate_out,
             'gate_in_last_hour' => $gate_in_last_hour
         );
     }

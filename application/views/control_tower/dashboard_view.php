@@ -24,6 +24,7 @@
         .badge-yard { background-color: #3b82f6; color: #ffffff; }
         .badge-waiting { background-color: #f59e0b; color: #ffffff; }
         .badge-over-sla { background-color: #ef476f; color: #ffffff; animation: pulse 1.5s infinite; }
+        .sos-active { animation: pulse 1s infinite; box-shadow: 0 0 0 4px rgba(239, 71, 111, 0.35); }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
@@ -35,7 +36,7 @@
             <h4 class="fw-bold mb-0">Control Tower LASMONO - Depo MTKI</h4>
         </div>
         <div class="d-flex align-items-center">
-            <button class="btn btn-danger btn-sm me-3 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#sosModal">
+            <button id="sosButton" class="btn btn-danger btn-sm me-3 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#sosModal">
                 <i class="fas fa-bell me-1"></i> SOS (<span id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>)
             </button>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-warning btn-sm me-3 fw-bold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
@@ -77,6 +78,7 @@
                     <div>
                         <small class="text-muted d-block mb-1">Truk di Yard</small>
                         <h2 class="fw-bold mb-0" style="color: #1e293b;" id="kpiInYard"><?= $kpi['truck_in_yard']; ?></h2>
+                        <small class="text-muted">Pending Yardman <span id="kpiPendingYard"><?= $kpi['pending_yard']; ?></span> &middot; Gate Out <span id="kpiPendingGateOut"><?= $kpi['pending_gate_out']; ?></span></small>
                     </div>
                     <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;">
                         <i class="fas fa-boxes fa-lg"></i>
@@ -151,6 +153,33 @@
                             <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #ef476f;"></span> High</span>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pop Up SOS Baru -->
+    <div class="modal fade" id="sosAlertModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> SOS BARU MASUK!</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="badge bg-danger fs-6" id="sosAlertType"></span>
+                        <small class="text-muted" id="sosAlertTime"></small>
+                    </div>
+                    <div class="mb-1"><b>No. Antrean:</b> #<span id="sosAlertQueue"></span></div>
+                    <div class="mb-2"><b>Nopol:</b> <span id="sosAlertPlate"></span></div>
+                    <div class="p-2 bg-light rounded" id="sosAlertDesc"></div>
+                    <div class="mt-2" id="sosAlertMedia"></div>
+                    <small class="text-muted d-block mt-2" id="sosAlertMore"></small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-danger fw-bold" id="sosAlertOpenList">Lihat Semua SOS</button>
                 </div>
             </div>
         </div>
@@ -249,6 +278,49 @@
             $('#heatmapGrid').html(html);
         }
 
+        // Pop up SOS: tampilkan laporan yang id-nya lebih baru dari yang sudah pernah terlihat
+        let lastSosId = <?php $max_sos = 0; foreach ($sos_reports as $sos) { $max_sos = max($max_sos, (int) $sos->id); } echo $max_sos; ?>;
+
+        function playAlarm() {
+            try {
+                let ctx = new (window.AudioContext || window.webkitAudioContext)();
+                [0, 0.35, 0.7].forEach(function(t) {
+                    let osc = ctx.createOscillator();
+                    let gain = ctx.createGain();
+                    osc.frequency.value = 880;
+                    gain.gain.value = 0.15;
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + t);
+                    osc.stop(ctx.currentTime + t + 0.2);
+                });
+            } catch (e) {}
+        }
+
+        function showSosAlert(reports) {
+            let fresh = reports.filter(function(s) { return parseInt(s.id, 10) > lastSosId && s.is_resolved == 0; });
+            reports.forEach(function(s) { lastSosId = Math.max(lastSosId, parseInt(s.id, 10)); });
+            if (!fresh.length) return;
+
+            let sos = fresh[0];
+            $('#sosAlertType').text(sos.report_type);
+            $('#sosAlertTime').text(sos.created_at);
+            $('#sosAlertQueue').text(sos.queue_number);
+            $('#sosAlertPlate').text(sos.license_plate);
+            $('#sosAlertDesc').text(sos.description);
+            $('#sosAlertMedia').html(sos.media_path
+                ? '<a href="' + esc(MEDIA_BASE + sos.media_path) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-danger fw-bold"><i class="fas fa-paperclip me-1"></i> Lihat Bukti</a>'
+                : '');
+            $('#sosAlertMore').text(fresh.length > 1 ? '+' + (fresh.length - 1) + ' laporan SOS baru lainnya' : '');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('sosAlertModal')).show();
+            playAlarm();
+        }
+
+        $('#sosAlertOpenList').on('click', function() {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('sosAlertModal')).hide();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('sosModal')).show();
+        });
+
         function renderSos(reports) {
             let html = '';
             let openCount = 0;
@@ -272,6 +344,7 @@
             });
             $('#sosTableBody').html(html);
             $('#sosCount').text(openCount);
+            $('#sosButton').toggleClass('sos-active', openCount > 0);
         }
 
         function resolveSos(btn, retried) {
@@ -317,6 +390,9 @@
                     renderQueues(data.queues);
                     renderHeatmap(data.heatmap);
                     renderSos(data.sos_reports);
+                    showSosAlert(data.sos_reports);
+                    $('#kpiPendingYard').text(data.kpi.pending_yard);
+                    $('#kpiPendingGateOut').text(data.kpi.pending_gate_out);
                 },
                 error: function(xhr) {
                     if (xhr.status === 401) window.location.reload();

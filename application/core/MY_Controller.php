@@ -9,6 +9,9 @@ class MY_Controller extends CI_Controller {
     // Antrean WAITING_GATE yang tidak di-Gate In dalam rentang ini dianggap kedaluwarsa
     const QUEUE_EXPIRY_HOURS = 12;
 
+    // Target KPI per tahap proses di dalam depo (menit)
+    const STAGE_KPI_MINUTES = 5;
+
     // Role yang boleh mengakses controller turunan (kosong = publik)
     protected $allowed_roles = array();
 
@@ -77,6 +80,38 @@ class MY_Controller extends CI_Controller {
             return NULL;
         }
         return (int) $queue->sla_target_minutes * 60 - (time() - strtotime($queue->gate_in_at));
+    }
+
+    // Daftar antrean yang menunggu diproses pada tahap tertentu (belum di-scan)
+    // WAITING_GATE = menunggu Gate In, IN_YARD = menunggu Yardman, AT_YARD = menunggu Gate Out
+    protected function _pending_queues($status) {
+        $since_column = array('WAITING_GATE' => 'q.created_at', 'IN_YARD' => 'q.gate_in_at', 'AT_YARD' => 'q.yard_scan_at');
+        $column = $since_column[$status];
+
+        $sql = "SELECT q.queue_number, q.license_plate, z.zone_code, TIMESTAMPDIFF(MINUTE, {$column}, ?) AS waiting_minutes
+                FROM queue_transactions q
+                LEFT JOIN yard_zones z ON z.id = q.current_zone_id
+                WHERE q.status = ?";
+        $params = array($this->_now(), $status);
+        if ($status === 'WAITING_GATE') {
+            $sql .= " AND q.created_at >= ?";
+            $params[] = $this->_expiry_cutoff();
+        }
+        $rows = $this->db->query($sql . " ORDER BY q.id ASC", $params)->result();
+
+        $pending = array();
+        foreach ($rows as $row) {
+            $minutes = max(0, (int) $row->waiting_minutes);
+            $pending[] = array(
+                'queue_number'    => $row->queue_number,
+                'license_plate'   => $row->license_plate,
+                'zone_code'       => $row->zone_code,
+                'waiting_minutes' => $minutes,
+                // Antre di luar belum dihitung KPI; tahap di dalam depo target STAGE_KPI_MINUTES
+                'overdue'         => $status !== 'WAITING_GATE' && $minutes > self::STAGE_KPI_MINUTES
+            );
+        }
+        return $pending;
     }
 
     // Estimasi menit sampai dipanggil Gate In berdasarkan throughput 2 jam terakhir

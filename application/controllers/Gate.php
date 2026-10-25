@@ -18,6 +18,19 @@ class Gate extends MY_Controller {
         $this->load->view('gate/terminal_view', $data);
     }
 
+    // Daftar truk yang belum di-scan sesuai wewenang petugas gate
+    public function pending_json() {
+        $role = $this->session->userdata('role');
+        $data = array();
+        if (in_array($role, array('GATE_IN', 'CONTROL_TOWER'), TRUE)) {
+            $data['gate_in'] = $this->_pending_queues('WAITING_GATE');
+        }
+        if (in_array($role, array('GATE_OUT', 'CONTROL_TOWER'), TRUE)) {
+            $data['gate_out'] = $this->_pending_queues('AT_YARD');
+        }
+        $this->_json($data);
+    }
+
     // Process Scan khusus Barcode Scanner Gerbang Security
     public function process_scan() {
         $queue_number = strtoupper(trim((string) $this->input->post('queue_number')));

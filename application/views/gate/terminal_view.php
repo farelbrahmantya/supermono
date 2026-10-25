@@ -281,6 +281,59 @@
                 </div>
             </div>
         </div>
+
+        <!-- Antrean Pending (belum di-scan) -->
+        <div class="row g-4 mt-1">
+            <?php if (in_array($role, array('GATE_IN', 'CONTROL_TOWER'))): ?>
+                <div class="col-lg-6">
+                    <div class="recent-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0 text-dark">
+                                <i class="fas fa-hourglass-half text-warning me-2"></i> Pending Gate In (Belum Di-scan)
+                            </h6>
+                            <span class="badge bg-warning-subtle text-dark fw-bold" id="pendingGateInCount">0 Truk</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-custom align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>No. Antrean</th>
+                                        <th>Nopol</th>
+                                        <th>Menunggu</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pendingGateInBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <?php if (in_array($role, array('GATE_OUT', 'CONTROL_TOWER'))): ?>
+                <div class="col-lg-6">
+                    <div class="recent-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0 text-dark">
+                                <i class="fas fa-hourglass-end text-warning me-2"></i> Pending Gate Out (Selesai di Yard)
+                            </h6>
+                            <span class="badge bg-warning-subtle text-dark fw-bold" id="pendingGateOutCount">0 Truk</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-custom align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>No. Antrean</th>
+                                        <th>Nopol</th>
+                                        <th>Blok</th>
+                                        <th>Menunggu</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pendingGateOutBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
     </main>
 
     <footer class="bg-white border-top py-3 text-center text-muted small">
@@ -303,6 +356,40 @@
         }
 
         let processedCount = 0;
+
+        function renderPending(key, rows, showZone) {
+            let body = $('#pending' + key + 'Body');
+            if (!body.length) return;
+            $('#pending' + key + 'Count').text(rows.length + ' Truk');
+            if (!rows.length) {
+                body.html('<tr><td colspan="' + (showZone ? 4 : 3) + '" class="text-center text-muted py-3">Tidak ada antrean pending.</td></tr>');
+                return;
+            }
+            let html = '';
+            rows.forEach(function(r) {
+                html += '<tr>' +
+                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + '</td>' +
+                    '<td>' + esc(r.license_plate) + '</td>' +
+                    (showZone ? '<td>' + esc(r.zone_code || '-') + '</td>' : '') +
+                    '<td><span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span></td>' +
+                '</tr>';
+            });
+            body.html(html);
+        }
+
+        function loadPending() {
+            $.ajax({
+                url: "<?= base_url('gate/pending_json'); ?>",
+                data: { _: Date.now() },
+                dataType: "json",
+                success: function(res) {
+                    if (res.gate_in) renderPending('GateIn', res.gate_in, false);
+                    if (res.gate_out) renderPending('GateOut', res.gate_out, true);
+                }
+            });
+        }
+        loadPending();
+        setInterval(loadPending, 5000);
 
         // Kunci kursor otomatis agar tidak lepas dari input box
         $(document).ready(function() {$('#gateBarcodeInput').focus();
@@ -340,6 +427,7 @@
 
                     if (res.status === 'success') {
                         addRecentRow(code, res.message);
+                        loadPending();
                     }
 
                     setTimeout(function() {

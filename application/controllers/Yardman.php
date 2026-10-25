@@ -17,6 +17,11 @@ class Yardman extends MY_Controller {
         $this->load->view('yardman/scanner_view', $data);
     }
 
+    // Daftar truk yang sudah Gate In tapi belum diverifikasi Yardman
+    public function pending_json() {
+        $this->_json(array('yard' => $this->_pending_queues('IN_YARD')));
+    }
+
     // API Pemrosesan Scan Barcode Yardman (IN_YARD -> AT_YARD) + Anti Double Scan
     // Gate In & Gate Out hanya boleh dilakukan Security di halaman Gate.
     public function process_scan() {
