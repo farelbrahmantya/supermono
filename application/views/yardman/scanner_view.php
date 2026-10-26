@@ -296,6 +296,10 @@
             $('#btnTorch, #btnSwitch').hide();
         }
 
+        // Mode kamera: 0 = kamera belakang 1280x720, 1 = kamera belakang tanpa syarat resolusi (cadangan iPhone)
+        let simpleMode = 0;
+        let watchdog = null;
+
         function startCamera() {
             if (typeof Html5Qrcode === 'undefined') {
                 showCamOff('Pemindai gagal dimuat', 'Periksa koneksi internet, lalu muat ulang halaman. Input manual tetap bisa dipakai.');
@@ -309,25 +313,60 @@
                 // QR supir + barcode garis di kertas kitir
                 scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] });
             }
+            // Kamera dipilih manual lewat tombol ganti kamera; bawaan = kamera belakang utama dari browser
             let useDevice = cameraIndex >= 0 && cameras[cameraIndex];
             let source = useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: 'environment' };
-            // Tanpa paksa rasio 1:1 (iPhone bisa menolak / memotong gambar), minta resolusi tinggi agar QR kecil tetap terbaca
-            let constraints = $.extend({}, useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: { ideal: 'environment' } },
-                { width: { ideal: 1920 }, height: { ideal: 1080 } });
+            let config = { fps: 10 };
+            if (simpleMode === 0) {
+                config.videoConstraints = $.extend({}, useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: { ideal: 'environment' } },
+                    { width: { ideal: 1280 }, height: { ideal: 720 } });
+            }
 
             $('#cam').removeClass('off');
             camStatus('Menyalakan kamera...');
-            scanner.start(source, { fps: 12, videoConstraints: constraints }, onDecoded, function() {})
+            scanner.start(source, config, onDecoded, function() {})
                 .then(function() {
                     camStatus('Arahkan kamera ke QR di HP supir');
+                    ensureVideoPlaying();
                     fitCameraBox();
                     setupCameraTools();
                 })
                 .catch(function(err) {
-                    let denied = String(err).toLowerCase().indexOf('permission') !== -1 || String(err).indexOf('NotAllowed') !== -1;
+                    let text = String(err);
+                    let denied = text.toLowerCase().indexOf('permission') !== -1 || text.indexOf('NotAllowed') !== -1;
+                    // Resolusi tidak didukung: coba lagi tanpa syarat resolusi
+                    if (!denied && simpleMode === 0) {
+                        simpleMode = 1;
+                        startCamera();
+                        return;
+                    }
                     showCamOff(denied ? 'Izin kamera ditolak' : 'Kamera tidak bisa dibuka',
                         denied ? 'Izinkan akses kamera di pengaturan browser, lalu ketuk Aktifkan Kamera.' : 'Tutup aplikasi lain yang memakai kamera, lalu coba lagi.');
                 });
+        }
+
+        // Safari iPhone: video wajib inline + muted dan diputar manual, jika tidak gambar tetap hitam
+        function ensureVideoPlaying() {
+            let video = document.querySelector('#reader video');
+            if (!video) return;
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.muted = true;
+            try { let p = video.play(); if (p && p.catch) p.catch(function() {}); } catch (e) {}
+
+            // Jika 3 detik gambar belum bergerak, nyalakan ulang kamera dengan mode cadangan
+            clearTimeout(watchdog);
+            let startTime = video.currentTime;
+            watchdog = setTimeout(function() {
+                let v = document.querySelector('#reader video');
+                let frozen = !v || v.readyState < 2 || !v.videoWidth || v.currentTime === startTime;
+                if (frozen && simpleMode === 0 && !$('#cam').hasClass('paused')) {
+                    simpleMode = 1;
+                    camStatus('Menyesuaikan kamera...');
+                    scanner.stop().then(startCamera).catch(startCamera);
+                }
+            }, 3000);
         }
 
         function setupCameraTools() {
@@ -341,27 +380,7 @@
             Html5Qrcode.getCameras().then(function(list) {
                 cameras = list || [];
                 $('#btnSwitch').toggle(cameras.length > 1);
-                // Pertama kali: pindah ke kamera belakang terbaik (iPhone Pro: "Back Triple/Dual Wide Camera"
-                // bisa beralih ke lensa makro, sehingga QR dari jarak dekat tetap fokus)
-                if (cameraIndex === -1) {
-                    cameraIndex = preferredBackCamera(cameras);
-                    let running = '';
-                    try { running = scanner.getRunningTrackSettings().deviceId || ''; } catch (e) {}
-                    if (cameraIndex >= 0 && cameras[cameraIndex].id !== running) {
-                        scanner.stop().then(startCamera).catch(startCamera);
-                    }
-                }
             }).catch(function() { $('#btnSwitch').hide(); });
-        }
-
-        function preferredBackCamera(list) {
-            let order = [/triple/i, /dual wide/i, /dual/i, /(back|rear|belakang|environment)/i];
-            for (let i = 0; i < order.length; i++) {
-                for (let j = 0; j < list.length; j++) {
-                    if (order[i].test(list[j].label) && !/(front|depan|user|ultra|tele)/i.test(list[j].label)) return j;
-                }
-            }
-            return -1;
         }
 
         // Kotak kamera mengikuti rasio video asli agar gambar tidak terpotong
@@ -393,7 +412,11 @@
         $('#btnSwitch').on('click', function() {
             if (!cameras.length) return;
             cameraIndex = (cameraIndex + 1) % cameras.length;
+            simpleMode = 0;
+            let label = cameras[cameraIndex].label || ('Kamera ' + (cameraIndex + 1));
             scanner.stop().then(startCamera).catch(startCamera);
+            setTimeout(function() { camStatus(label); }, 1200);
+            setTimeout(function() { if (!$('#cam').hasClass('paused')) camStatus('Arahkan kamera ke QR di HP supir'); }, 3500);
         });
 
         function pauseCamera() {
@@ -405,6 +428,7 @@
             $('#cam').removeClass('paused detected');
             camStatus('Arahkan kamera ke QR di HP supir');
             try { if (scanner && scanner.getState && scanner.getState() === Html5QrcodeScannerState.PAUSED) scanner.resume(); } catch (e) {}
+            ensureVideoPlaying();
         }
 
         function onDecoded(text) {
