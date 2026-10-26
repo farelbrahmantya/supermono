@@ -3,7 +3,7 @@
 // Pemakaian: $this->load->view('partials/logo', array('size' => 44));
 $size = isset($size) ? (int) $size : 44;
 ?>
-<svg class="lx-avatar" width="<?= $size; ?>" height="<?= $size; ?>" viewBox="0 0 120 120" role="img" aria-label="Logo LASMONO">
+<svg xmlns="http://www.w3.org/2000/svg" class="lx-avatar" width="<?= $size; ?>" height="<?= $size; ?>" viewBox="0 0 120 120" role="img" aria-label="Logo LASMONO">
     <defs><clipPath id="lxAvatarClip"><circle cx="60" cy="60" r="60"/></clipPath></defs>
     <g clip-path="url(#lxAvatarClip)">
         <!-- Lencana emas + ombak -->

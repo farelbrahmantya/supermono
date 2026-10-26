@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<?= rawurlencode($this->load->view('partials/logo', array('size' => 64), TRUE)); ?>">
+<?php $this->load->view('partials/favicon'); ?>
 <style>
     :root {
         --lx-ink: #1c1d21;
