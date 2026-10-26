@@ -6,15 +6,18 @@
     <title>Riwayat Trucking - Control Tower LASMONO</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php $this->load->view('partials/theme'); ?>
     <style>
-        body { background-color: #f4f6f9; color: #2b2d42; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .navbar-custom { background-color: #0b1e38; padding: 15px 30px; }
-        .card-kpi { background: #ffffff; border-radius: 12px; border: none; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); height: 100%; }
-        .card-section { background: #ffffff; border-radius: 12px; border: none; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        .table-custom th { background-color: #f8f9fa; color: #6c757d; font-size: 12px; font-weight: 600; border-bottom: 2px solid #edf2f7; white-space: nowrap; }
-        .table-custom td { padding: 10px 8px; font-size: 13px; color: #2d3748; vertical-align: middle; white-space: nowrap; }
-        .stage-ok { color: #16a34a; font-weight: 700; }
-        .stage-late { color: #dc2626; font-weight: 700; }
+        .card-kpi { background: #fff; border: 1px solid var(--lx-border); border-radius: 20px; padding: 20px; box-shadow: var(--lx-shadow); height: 100%; }
+        .card-section { background: #fff; border: 1px solid var(--lx-border); border-radius: 22px; padding: 24px; box-shadow: var(--lx-shadow); }
+        .table-custom th { background: #f8fafc; color: var(--lx-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid var(--lx-border); white-space: nowrap; padding: 12px 10px; }
+        .table-custom td { padding: 12px 10px; font-size: 13px; vertical-align: middle; white-space: nowrap; border-color: #f1f5f9; }
+        .table-custom tbody tr:hover td { background: #fafbff; }
+        .stage-ok { display: inline-block; min-width: 42px; text-align: center; padding: 3px 8px; border-radius: 8px; background: #dcfce7; color: #047857; font-weight: 700; }
+        .stage-late { display: inline-block; min-width: 42px; text-align: center; padding: 3px 8px; border-radius: 8px; background: #fee2e2; color: #b91c1c; font-weight: 700; }
+        .quick a { border-radius: 50px; }
+        .page-title h4 { font-weight: 800; }
+        @media print { .lx-topbar, form.card-section { display: none !important; } body { background: #fff; } }
     </style>
 </head>
 <body>
@@ -33,31 +36,37 @@
     ?>
 
     <!-- Top Header -->
-    <div class="navbar-custom d-flex justify-content-between align-items-center text-white mb-4">
-        <div class="d-flex align-items-center">
-            <div class="bg-white text-dark fw-bold rounded p-2 me-3" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #0b1e38 !important;">LAS</div>
-            <h4 class="fw-bold mb-0">Riwayat Trucking Selesai</h4>
+    <header class="lx-topbar d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <span class="lx-logo"><i class="fas fa-tower-broadcast"></i></span>
+            <div>
+                <div class="lx-brand fs-5">Riwayat Trucking</div>
+                <div class="lx-sub">Control Tower LASMONO &middot; truk yang sudah Gate Out</div>
+            </div>
         </div>
-        <div class="d-flex align-items-center">
-            <a href="<?= base_url('control_tower'); ?>" class="btn btn-outline-light btn-sm me-3 fw-bold"><i class="fas fa-arrow-left me-1"></i> Dashboard</a>
-            <span class="me-3 text-light opacity-75 small">Admin: <?= html_escape($admin_name); ?></span>
-            <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i></a>
+        <div class="d-flex align-items-center gap-2">
+            <a href="<?= base_url('control_tower'); ?>" class="btn btn-sm fw-semibold" style="background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.14); padding: 8px 14px;"><i class="fas fa-arrow-left me-1"></i> Dashboard</a>
+            <button type="button" onclick="window.print()" class="btn btn-sm fw-semibold d-none d-md-inline-block" style="background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.14); padding: 8px 14px;"><i class="fas fa-print me-1"></i> Cetak</button>
+            <span class="lx-user d-none d-md-inline-flex">
+                <i class="fas fa-user-tie" style="color: #a5b4fc;"></i> <?= html_escape($admin_name); ?>
+                <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
+            </span>
         </div>
-    </div>
+    </header>
 
     <div class="container-fluid px-4 pb-5">
         <!-- Filter Rentang Waktu (berdasarkan waktu Gate Out) -->
         <form method="GET" action="<?= base_url('control_tower/history'); ?>" class="card-section mb-4">
             <div class="row g-3 align-items-end">
                 <div class="col-sm-6 col-md-3">
-                    <label class="form-label small fw-bold text-muted mb-1">DARI TANGGAL (GATE OUT)</label>
+                    <label class="lx-eyebrow mb-1 d-block">Dari tanggal (Gate Out)</label>
                     <input type="date" name="from" class="form-control" value="<?= html_escape($date_from); ?>" required>
                 </div>
                 <div class="col-sm-6 col-md-3">
-                    <label class="form-label small fw-bold text-muted mb-1">SAMPAI TANGGAL</label>
+                    <label class="lx-eyebrow mb-1 d-block">Sampai tanggal</label>
                     <input type="date" name="to" class="form-control" value="<?= html_escape($date_to); ?>" required>
                 </div>
-                <div class="col-md-6 d-flex flex-wrap gap-2">
+                <div class="col-md-6 d-flex flex-wrap gap-2 quick">
                     <button type="submit" class="btn btn-primary fw-bold"><i class="fas fa-search me-1"></i> Tampilkan</button>
                     <a href="<?= base_url('control_tower/history?from=' . date('Y-m-d') . '&to=' . date('Y-m-d')); ?>" class="btn btn-outline-secondary">Hari Ini</a>
                     <a href="<?= base_url('control_tower/history?from=' . date('Y-m-d', strtotime('-6 days')) . '&to=' . date('Y-m-d')); ?>" class="btn btn-outline-secondary">7 Hari</a>
@@ -99,14 +108,14 @@
         <!-- Tabel Riwayat -->
         <div class="card-section">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0" style="color: #0f172a;">Daftar Truk Selesai</h5>
+                <h5 class="fw-bold mb-0">Daftar Truk Selesai</h5>
                 <small class="text-muted">
                     <?= date('d/m/Y', strtotime($date_from)); ?> &ndash; <?= date('d/m/Y', strtotime($date_to)); ?> &middot;
                     durasi dalam menit, <span class="stage-ok">hijau</span> = capai target, <span class="stage-late">merah</span> = lewat target
                 </small>
             </div>
             <div class="table-responsive">
-                <table class="table table-custom table-hover mb-0">
+                <table class="table table-custom mb-0">
                     <thead>
                         <tr>
                             <th>Gate Out</th>

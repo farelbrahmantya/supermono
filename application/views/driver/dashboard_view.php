@@ -2,161 +2,217 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b1220">
     <title>LASMONO - Interface Supir</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php $this->load->view('partials/theme'); ?>
     <style>
-        body { background-color: #f0f4f8; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .mobile-container { max-width: 450px; margin: 0 auto; background: #fff; min-height: 100vh; position: relative; padding-bottom: 90px; }
-        .header-bg { background-color: #1a365d; color: white; padding: 20px; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; }
-        .card-custom { border-radius: 15px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-        .btn-sos { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 999; border-radius: 50px; padding: 12px 30px; font-weight: bold; box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4); }
-        .timer-circle { width: 170px; height: 170px; border-radius: 50%; border: 8px solid #198754; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 10px auto; transition: all 0.3s ease; }
-        .timer-circle.late { border-color: #dc3545; }
-        .timer-total { display: inline-flex; align-items: center; gap: 6px; background: #f1f5f9; border-radius: 50px; padding: 6px 14px; font-size: 13px; }
-        .timer-total.late { background: #fde2e4; color: #b42318; }
-        .stepper { display: flex; justify-content: space-between; margin: 4px 0 8px; }
-        .step { flex: 1; text-align: center; font-size: 11px; color: #94a3b8; position: relative; }
-        .step .dot { width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px; font-weight: 700; font-size: 12px; }
-        .step.done .dot { background: #198754; color: #fff; }
-        .step.active .dot { background: #0d6efd; color: #fff; box-shadow: 0 0 0 4px rgba(13,110,253,0.2); }
-        .step.active, .step.done { color: #1e293b; font-weight: 600; }
-        .location-box { background: #0b1e38; color: #fff; border-radius: 15px; padding: 14px; }
+        body { background: var(--lx-bg); }
+        .app { max-width: 460px; margin: 0 auto; min-height: 100vh; position: relative; padding-bottom: 110px; }
+
+        /* Header gradasi */
+        .head { position: relative; overflow: hidden; background: var(--lx-ink); color: #fff; padding: 20px 20px 92px; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; }
+        .head::before { content: ""; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: #3b5bfd; filter: blur(80px); opacity: .55; top: -140px; right: -90px; }
+        .head::after { content: ""; position: absolute; width: 240px; height: 240px; border-radius: 50%; background: #6d4aff; filter: blur(80px); opacity: .45; bottom: -150px; left: -60px; }
+        .head > * { position: relative; z-index: 1; }
+        .plate { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 6px 12px; font-weight: 800; letter-spacing: .06em; }
+
+        .content { padding: 0 16px; margin-top: -72px; position: relative; z-index: 2; }
+        .card-app { background: #fff; border-radius: 22px; border: 1px solid var(--lx-border); box-shadow: var(--lx-shadow); padding: 20px; margin-bottom: 14px; }
+
+        /* Nomor antrean */
+        .queue-no { font-size: clamp(24px, 8.4vw, 34px); white-space: nowrap; font-weight: 800; letter-spacing: -0.02em; background: var(--lx-grad); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.15; }
+        .meta-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
+
+        /* Lokasi */
+        .location-box { background: linear-gradient(135deg, #0f9b6e, #10b981); color: #fff; border-radius: 22px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; box-shadow: 0 12px 26px rgba(16, 185, 129, .28); margin-bottom: 14px; }
+        .location-box.pending { background: #fff; color: var(--lx-text); border: 1px dashed #cbd5e1; box-shadow: none; }
+        .location-box .ico { width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,.18); display: inline-flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .location-box.pending .ico { background: #f1f5f9; color: var(--lx-muted); }
+
+        /* Stepper */
+        .stepper { display: flex; align-items: flex-start; margin-bottom: 14px; }
+        .step { flex: 1; text-align: center; font-size: 11px; font-weight: 600; color: #94a3b8; position: relative; }
+        .step:not(:last-child)::after { content: ""; position: absolute; top: 15px; left: calc(50% + 18px); right: calc(-50% + 18px); height: 3px; border-radius: 3px; background: #e2e8f0; }
+        .step.done:not(:last-child)::after { background: var(--lx-success); }
+        .step .dot { width: 32px; height: 32px; border-radius: 50%; background: #eef1f6; color: #94a3b8; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-weight: 800; font-size: 13px; }
+        .step.done .dot { background: var(--lx-success); color: #fff; }
+        .step.active .dot { background: var(--lx-grad); color: #fff; box-shadow: 0 0 0 5px rgba(59, 91, 253, .15); }
+        .step.active, .step.done { color: var(--lx-text); }
+
+        /* Cincin timer */
+        .ring { position: relative; width: 210px; height: 210px; margin: 6px auto 12px; }
+        .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .ring .track { stroke: #eef1f6; }
+        .ring .bar { stroke: url(#ringGrad); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+        .ring.late .bar { stroke: var(--lx-danger); }
+        .ring .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .ring .time { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+        .ring.late .time { color: var(--lx-danger); }
+        .timer-total { display: inline-flex; align-items: center; gap: 8px; background: #f1f5ff; color: #2f47d6; border-radius: 50px; padding: 8px 16px; font-size: 13px; font-weight: 600; }
+        .timer-total b { font-variant-numeric: tabular-nums; }
+        .timer-total.late { background: #fee2e2; color: #b91c1c; }
+
+        /* QR & data kitir */
+        .qr-wrap { display: inline-block; padding: 14px; border-radius: 20px; background: #fff; border: 1px solid var(--lx-border); box-shadow: 0 10px 24px rgba(15, 23, 42, .06); }
+        .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: left; }
+        .kv div { background: #f8fafc; border-radius: 14px; padding: 10px 12px; }
+        .kv small { display: block; color: var(--lx-muted); font-size: 11px; font-weight: 600; }
+        .kv b { font-size: 14px; }
+        .empty-state .ico { width: 64px; height: 64px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 12px; }
+
+        /* SOS */
+        .btn-sos { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 999; border-radius: 50px; padding: 14px 28px; font-weight: 800; letter-spacing: .03em; border: none; color: #fff; background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 12px 28px rgba(239, 68, 68, .45); }
+        .btn-sos:hover { color: #fff; }
+        .alert { border-radius: 14px; }
+        .stage-icon { width: 84px; height: 84px; border-radius: 50%; background: #dcfce7; color: var(--lx-success); display: inline-flex; align-items: center; justify-content: center; font-size: 40px; box-shadow: 0 0 0 10px #f0fdf4; }
     </style>
 </head>
 <body>
-    <div class="mobile-container">
+    <?php
+        $status_labels = array(
+            'WAITING_GATE' => 'Menunggu Gate In',
+            'IN_YARD'      => 'Menuju Area Survey',
+            'IN_SURVEY'    => 'Sedang Survey',
+            'AT_YARD'      => 'Menuju Gate Out',
+            'COMPLETED'    => 'Selesai'
+        );
+        $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'AT_YARD' => 2);
+        $current_step = isset($step_index[$queue->status]) ? $step_index[$queue->status] : -1;
+    ?>
+    <div class="app">
         <!-- Header Informasi Armada -->
-        <div class="header-bg d-flex justify-content-between align-items-center">
-            <div>
-                <h5 class="fw-bold mb-0">LASMONO</h5>
-                <small class="text-light opacity-75">Armada: <b><?= html_escape($queue->license_plate); ?></b></small>
+        <div class="head">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="lx-logo" style="width: 36px; height: 36px; font-size: 15px;"><i class="fas fa-cubes-stacked"></i></span>
+                    <div>
+                        <div class="lx-brand">LASMONO</div>
+                        <div class="small" style="color: #94a3b8;">Portal Supir</div>
+                    </div>
+                </div>
+                <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
             </div>
-            <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i></a>
+            <div class="mt-3"><span class="plate"><i class="fas fa-truck-front" style="color: #a5b4fc;"></i><?= html_escape($queue->license_plate); ?></span></div>
         </div>
 
-        <div class="p-3">
-            <!-- Notifikasi Informasi Antrean Aktif -->
+        <div class="content">
             <?php if($this->session->flashdata('info_driver')): ?>
-                <div class="alert alert-info alert-dismissible fade show small py-2 border-0 shadow-sm mb-3" role="alert">
-                    <i class="fas fa-info-circle me-1"></i> <?= html_escape($this->session->flashdata('info_driver')); ?>
+                <div class="alert alert-primary alert-dismissible fade show small py-2 border-0 shadow-sm mb-3" role="alert">
+                    <i class="fas fa-circle-info me-1"></i> <?= html_escape($this->session->flashdata('info_driver')); ?>
                     <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
                 </div>
             <?php endif; ?>
-
-            <!-- Notifikasi Error SOS -->
             <?php if($this->session->flashdata('error_sos')): ?>
                 <div class="alert alert-danger py-2 small border-0 shadow-sm mb-3"><?= html_escape($this->session->flashdata('error_sos')); ?></div>
             <?php endif; ?>
-
-            <!-- Notifikasi Sukses SOS -->
             <?php if($this->session->flashdata('success_sos')): ?>
-                <div class="alert alert-success py-2 small border-0 shadow-sm mb-3"><?= html_escape($this->session->flashdata('success_sos')); ?></div>
+                <div class="alert alert-success py-2 small border-0 shadow-sm mb-3"><i class="fas fa-circle-check me-1"></i> <?= html_escape($this->session->flashdata('success_sos')); ?></div>
             <?php endif; ?>
 
-            <?php
-                $status_labels = array(
-                    'WAITING_GATE' => 'Menunggu Gate In',
-                    'IN_YARD'      => 'Menuju Area Survey',
-                    'IN_SURVEY'    => 'Sedang Survey',
-                    'AT_YARD'      => 'Menuju Gate Out',
-                    'COMPLETED'    => 'Selesai'
-                );
-                $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'AT_YARD' => 2);
-                $current_step = isset($step_index[$queue->status]) ? $step_index[$queue->status] : -1;
-            ?>
-
-            <!-- Card Nomor Antrean & FIFO -->
-            <div class="card card-custom p-3 text-center mb-3">
-                <span class="text-muted small">Nomor Antrean Anda:</span>
-                <h1 class="fw-bold text-primary display-5 mb-0">#<?= html_escape($queue->queue_number); ?></h1>
-                <div class="mt-2">
-                    <span id="positionBadge" class="badge bg-primary" <?= $queue_position === NULL ? 'style="display:none;"' : ''; ?>>Urutan ke-<span id="queuePosition"><?= $queue_position; ?></span> (FIFO)</span>
-                    <span id="statusBadge" class="badge <?= $queue->status === 'WAITING_GATE' ? 'bg-warning text-dark' : 'bg-primary text-white'; ?>">
-                        <?= html_escape(isset($status_labels[$queue->status]) ? $status_labels[$queue->status] : $queue->status); ?>
+            <!-- Nomor Antrean & FIFO -->
+            <div class="card-app text-center lx-rise">
+                <div class="lx-eyebrow mb-1">Nomor Antrean Anda</div>
+                <div class="queue-no mb-2">#<?= html_escape($queue->queue_number); ?></div>
+                <div class="meta-row">
+                    <span id="positionBadge" class="lx-pill lx-pill-blue" <?= $queue_position === NULL ? 'style="display:none;"' : ''; ?>><i class="fas fa-list-ol"></i><span>Urutan ke-<span id="queuePosition"><?= $queue_position; ?></span></span></span>
+                    <span id="statusBadge" class="lx-pill <?= $queue->status === 'WAITING_GATE' ? 'lx-pill-amber' : 'lx-pill-green'; ?>">
+                        <i class="fas fa-circle" style="font-size: 7px;"></i> <?= html_escape(isset($status_labels[$queue->status]) ? $status_labels[$queue->status] : $queue->status); ?>
                     </span>
                 </div>
-                <small class="text-muted mt-2" id="estimatedWaitText"><?php if ($estimated_wait !== NULL): ?>Estimasi dipanggil Gate In &plusmn;<?= $estimated_wait; ?> menit<?php endif; ?></small>
+                <div class="small text-secondary mt-2" id="estimatedWaitText"><?php if ($estimated_wait !== NULL): ?><?= $estimated_wait > 0 ? 'Estimasi dipanggil Gate In &plusmn;' . $estimated_wait . ' menit' : 'Anda antrean berikutnya, siapkan kitir'; ?><?php endif; ?></div>
             </div>
 
             <?php if (!empty($queue->gate_in_at)): ?>
             <!-- Lokasi Penempatan (ditentukan Yardman setelah survey) -->
-            <div class="location-box text-center mb-3">
-                <?php if (!empty($queue->zone_code)): ?>
-                    <small class="opacity-75 d-block">Lokasi Penempatan Container</small>
-                    <div class="h3 fw-bold mb-0"><?= html_escape($queue->depo); ?> &middot; Blok <?= html_escape($queue->zone_code); ?></div>
-                <?php else: ?>
-                    <small class="opacity-75 d-block">Lokasi Penempatan Container</small>
-                    <div class="fw-semibold">Depo &amp; blok ditentukan Yardman setelah survey selesai</div>
-                <?php endif; ?>
+            <div class="location-box <?= empty($queue->zone_code) ? 'pending' : ''; ?> lx-rise">
+                <span class="ico"><i class="fas <?= empty($queue->zone_code) ? 'fa-map-location-dot' : 'fa-location-dot'; ?>"></i></span>
+                <div>
+                    <div class="small" style="opacity: .8;">Lokasi Penempatan Container</div>
+                    <?php if (!empty($queue->zone_code)): ?>
+                        <div class="h4 fw-bold mb-0"><?= html_escape($queue->depo); ?> &middot; Blok <?= html_escape($queue->zone_code); ?></div>
+                    <?php else: ?>
+                        <div class="fw-semibold">Ditentukan Yardman setelah survey selesai</div>
+                    <?php endif; ?>
+                </div>
             </div>
             <?php endif; ?>
 
             <!-- Timer KPI: besar = tahap berjalan, kecil = total proses -->
-            <div class="card card-custom p-3 text-center mb-3" id="timerCard">
+            <div class="card-app text-center lx-rise" id="timerCard">
                 <?php if ($timer !== NULL): ?>
                     <div class="stepper">
                         <?php foreach (array('Gate In', 'Survey', 'Gate Out') as $i => $step_name): ?>
                             <div class="step <?= $i < $current_step ? 'done' : ($i === $current_step ? 'active' : ''); ?>">
-                                <div class="dot"><?= $i < $current_step ? '&#10003;' : $i + 1; ?></div><?= $step_name; ?>
+                                <div class="dot"><?= $i < $current_step ? '<i class="fas fa-check"></i>' : $i + 1; ?></div><?= $step_name; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    <span class="text-muted small">Timer Tahap: <b id="stageLabel"><?= html_escape($timer['stage_label']); ?></b></span>
-                    <div class="timer-circle" id="stageCircle">
-                        <span class="display-6 fw-bold mb-0" id="stageTimer">--:--</span>
-                        <small class="text-muted" style="font-size: 11px;">Target: <?= (int) $timer['stage_target_minutes']; ?> Mnt</small>
+                    <div class="lx-eyebrow">Timer Tahap &middot; <span id="stageLabel" style="color: var(--lx-primary);"><?= html_escape($timer['stage_label']); ?></span></div>
+                    <div class="ring" id="stageCircle">
+                        <svg viewBox="0 0 200 200">
+                            <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3b5bfd"/><stop offset="100%" stop-color="#6d4aff"/></linearGradient></defs>
+                            <circle class="track" cx="100" cy="100" r="88" fill="none" stroke-width="14"/>
+                            <circle class="bar" id="stageBar" cx="100" cy="100" r="88" fill="none" stroke-width="14" stroke-dasharray="552.92" stroke-dashoffset="0"/>
+                        </svg>
+                        <div class="center">
+                            <span class="time" id="stageTimer">--:--</span>
+                            <small class="text-secondary fw-semibold">Target <?= (int) $timer['stage_target_minutes']; ?> menit</small>
+                        </div>
                     </div>
                     <div class="timer-total" id="totalBox">
-                        <i class="fas fa-stopwatch"></i> Total proses: <b id="totalTimer">--:--</b> / <?= (int) $timer['total_target_minutes']; ?>:00
+                        <i class="fas fa-stopwatch"></i> Total proses <b id="totalTimer">--:--</b> / <?= (int) $timer['total_target_minutes']; ?>:00
                     </div>
-                    <small class="text-muted d-block mt-2" id="timerStatusText">Timer KPI berjalan sejak Gate In</small>
+                    <div class="small text-secondary mt-2" id="timerStatusText">Timer KPI berjalan sejak Gate In</div>
                 <?php else: ?>
-                    <i class="fas fa-hourglass-half fa-2x text-warning mb-2"></i>
-                    <div class="fw-semibold">Menunggu Gate In</div>
-                    <small class="text-muted">Timer KPI (Gate In &middot; Survey &middot; Gate Out, masing-masing 5 menit) mulai berjalan setelah security scan kitir Anda.</small>
+                    <div class="empty-state py-2">
+                        <span class="ico" style="background: #fef3c7; color: #d97706;"><i class="fas fa-hourglass-half"></i></span>
+                        <div class="fw-bold mb-1">Menunggu Gate In</div>
+                        <div class="small text-secondary">Timer KPI (Gate In &middot; Survey &middot; Gate Out, masing-masing 5 menit) mulai berjalan setelah security scan kitir Anda.</div>
+                    </div>
                 <?php endif; ?>
             </div>
 
             <!-- Barcode + Data Kitir (muncul setelah Gate In) -->
-            <div class="card card-custom p-3 text-center">
+            <div class="card-app text-center lx-rise">
                 <?php if ($qr_payload !== NULL): ?>
-                    <span class="text-muted small mb-2">Tunjukkan Barcode ke Yardman / Petugas Gate Out</span>
-                    <div class="d-flex justify-content-center mb-3">
-                        <div id="queueQr" data-code="<?= html_escape($qr_payload); ?>"></div>
+                    <div class="lx-eyebrow mb-3">Tunjukkan ke Yardman / Petugas Gate Out</div>
+                    <div class="qr-wrap mb-3"><div id="queueQr" data-code="<?= html_escape($qr_payload); ?>"></div></div>
+                    <div class="kv">
+                        <div style="grid-column: span 2;"><small>No. Container</small><b style="font-size: 18px;"><?= html_escape($queue->container_no); ?></b></div>
+                        <div><small>Principal</small><b><?= html_escape($queue->principal); ?></b></div>
+                        <div><small>Size</small><b><?= html_escape($queue->container_size); ?></b></div>
+                        <div style="grid-column: span 2;"><small>Customer</small><b><?= html_escape($queue->customer); ?></b></div>
                     </div>
-                    <table class="table table-sm text-start small mb-0">
-                        <tr><td class="text-muted">No. Container</td><td class="fw-bold"><?= html_escape($queue->container_no); ?></td></tr>
-                        <tr><td class="text-muted">Principal</td><td class="fw-semibold"><?= html_escape($queue->principal); ?></td></tr>
-                        <tr><td class="text-muted">Size</td><td class="fw-semibold"><?= html_escape($queue->container_size); ?></td></tr>
-                        <tr><td class="text-muted">Customer</td><td class="fw-semibold"><?= html_escape($queue->customer); ?></td></tr>
-                    </table>
                 <?php else: ?>
-                    <i class="fas fa-qrcode fa-2x text-muted mb-2"></i>
-                    <div class="fw-semibold">Barcode muncul setelah Gate In</div>
-                    <small class="text-muted">Siapkan kitir Anda untuk di-scan oleh security di Gate In.</small>
+                    <div class="empty-state py-2">
+                        <span class="ico" style="background: #eef2ff; color: var(--lx-primary);"><i class="fas fa-qrcode"></i></span>
+                        <div class="fw-bold mb-1">Barcode muncul setelah Gate In</div>
+                        <div class="small text-secondary">Siapkan kitir Anda untuk di-scan oleh security di Gate In.</div>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
 
         <!-- Tombol Darurat SOS Floating -->
-        <button class="btn btn-danger btn-sos" data-bs-toggle="modal" data-bs-target="#sosModal">
-            <i class="fas fa-exclamation-triangle me-2"></i> LASMONO SOS
+        <button class="btn btn-sos" data-bs-toggle="modal" data-bs-target="#sosModal">
+            <i class="fas fa-triangle-exclamation me-2"></i> LAPOR SOS
         </button>
     </div>
 
     <!-- Pop Up Tahap Selesai -->
     <div class="modal fade" id="stageModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0 text-center">
+            <div class="modal-content text-center">
                 <div class="modal-body p-4">
-                    <div class="mb-3"><i class="fas fa-check-circle text-success" style="font-size: 64px;"></i></div>
+                    <div class="mb-3 mt-2"><span class="stage-icon"><i class="fas fa-check"></i></span></div>
                     <h4 class="fw-bold mb-2" id="stageModalTitle"></h4>
                     <div id="stageModalDuration" class="mb-2"></div>
-                    <p class="text-muted mb-3" id="stageModalText"></p>
-                    <div id="stageModalNext" class="alert alert-primary py-2 small fw-semibold mb-3"></div>
-                    <button type="button" class="btn btn-primary w-100 fw-bold" data-bs-dismiss="modal">OK, MENGERTI</button>
+                    <p class="text-secondary mb-3" id="stageModalText"></p>
+                    <div id="stageModalNext" class="alert alert-primary border-0 py-2 small fw-semibold mb-3"></div>
+                    <button type="button" class="btn btn-primary w-100 py-3 fw-bold" data-bs-dismiss="modal">OK, Mengerti</button>
                 </div>
             </div>
         </div>
@@ -166,38 +222,38 @@
     <div class="modal fade" id="sosModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title fw-bold"><i class="fas fa-bullhorn me-2"></i> Lapor Pungli / Penyerobotan</h5>
+                <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #ef4444, #b91c1c);">
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0"><i class="fas fa-bullhorn me-2"></i> Lapor Pungli / Penyerobotan</h5>
+                        <small style="opacity: .85;">Laporan langsung diterima Control Tower</small>
+                    </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <form action="<?= base_url('driver/submit_sos'); ?>" method="POST" enctype="multipart/form-data" data-csrf-refresh>
-                    <div class="modal-body text-dark">
+                    <div class="modal-body">
                         <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
-                        
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Jenis Pelanggaran</label>
-                            <select name="report_type" class="form-select" required>
+                            <label class="form-label small fw-bold text-secondary">JENIS PELANGGARAN</label>
+                            <select name="report_type" class="form-select fw-semibold" required>
                                 <option value="PUNGLI">Indikasi Pungli</option>
                                 <option value="PENYEROBOTAN">Penyerobotan Antrean</option>
                                 <option value="LAINNYA">Lainnya</option>
                             </select>
                         </div>
-
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Deskripsi Kejadian</label>
+                            <label class="form-label small fw-bold text-secondary">DESKRIPSI KEJADIAN</label>
                             <textarea name="description" class="form-control" rows="3" maxlength="1000" placeholder="Jelaskan kronologi & lokasi kejadian..." required></textarea>
                         </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Unggah Bukti Foto / Video <small class="text-muted">(Maks. 10MB)</small></label>
+                        <div class="mb-1">
+                            <label class="form-label small fw-bold text-secondary">BUKTI FOTO / VIDEO <span class="fw-normal">(opsional, maks. 10MB)</span></label>
                             <input type="file" name="sos_media" class="form-control" accept="image/jpeg,image/png,video/mp4,video/quicktime">
-                            <small class="text-muted mt-1 d-block" style="font-size: 11px;">
-                                <i class="fas fa-info-circle me-1"></i> Format: JPG, PNG, MP4, MOV (Maks. 10MB)
-                            </small>
+                            <small class="text-secondary mt-1 d-block" style="font-size: 11px;">Format: JPG, PNG, MP4, MOV</small>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="submit" class="btn btn-danger w-100 fw-bold">KIRIM LAPORAN KE CONTROL TOWER</button>
+                    <div class="modal-footer border-0 pt-0">
+                        <button type="submit" class="btn btn-danger w-100 py-3 fw-bold" style="background: linear-gradient(135deg, #ef4444, #dc2626); border: none;">
+                            <i class="fas fa-paper-plane me-1"></i> Kirim Laporan
+                        </button>
                     </div>
                 </form>
             </div>
@@ -239,6 +295,7 @@
         }
 
         let currentStatus = "<?= $queue->status; ?>";
+        const STAGE_SECONDS = <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?> * 60;
         let stageEnd = null;
         let totalEnd = null;
 
@@ -265,7 +322,9 @@
             $('#stageTimer').text(fmt(stageLeft));
             $('#totalTimer').text(fmt(totalLeft));
             $('#stageCircle').toggleClass('late', stageLeft < 0);
-            $('#stageTimer').toggleClass('text-danger', stageLeft < 0);
+            // Cincin berkurang mengikuti sisa waktu tahap (penuh = 5 menit)
+            let ratio = Math.max(0, Math.min(1, stageLeft / (STAGE_SECONDS)));
+            $('#stageBar').attr('stroke-dashoffset', (552.92 * (1 - (stageLeft < 0 ? 1 : ratio))).toFixed(1));
             $('#totalBox').toggleClass('late', totalLeft < 0);
             $('#timerStatusText').text(stageLeft < 0 ? 'Tahap ini melewati target KPI ' + <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?> + ' menit' : 'Timer KPI berjalan sejak Gate In');
         }
@@ -280,12 +339,12 @@
             }
             $('#queuePosition').text(position);
             $('#positionBadge').show();
-            $('#estimatedWaitText').text(estimatedWait === null ? '' : 'Estimasi dipanggil Gate In \u00b1' + estimatedWait + ' menit');
+            $('#estimatedWaitText').text(estimatedWait === null ? '' : (estimatedWait > 0 ? 'Estimasi dipanggil Gate In \u00b1' + estimatedWait + ' menit' : 'Anda antrean berikutnya, siapkan kitir'));
         }
 
         function showCompleted(durations) {
             stageEnd = null;
-            let html = '<i class="fas fa-check-circle fa-2x text-success mb-2"></i><div class="fw-bold mb-2">Servis Selesai (Gate Out)</div>';
+            let html = '<div class="empty-state py-1"><span class="ico" style="background: #dcfce7; color: #10b981;"><i class="fas fa-flag-checkered"></i></span><div class="fw-bold mb-3">Servis Selesai (Gate Out)</div></div>';
             html += '<table class="table table-sm small text-start mb-0">';
             durations.forEach(function(d) {
                 html += '<tr><td>' + $('<div>').text(d.label).html() + '</td><td class="text-end fw-bold ' + (d.achieved ? 'text-success' : 'text-danger') + '">' +
@@ -293,7 +352,7 @@
             });
             html += '</table>';
             $('#timerCard').html(html);
-            $('#statusBadge').removeClass('bg-warning text-dark bg-primary').addClass('bg-success text-white').text('Selesai');
+            $('#statusBadge').attr('class', 'lx-pill lx-pill-green').html('<i class="fas fa-check"></i> Selesai');
         }
 
         // POP UP setiap tahap selesai
@@ -327,7 +386,7 @@
             $('#stageModalText').text(popup.text);
             $('#stageModalNext').text(popup.next);
             $('#stageModalDuration').html(duration
-                ? '<span class="badge fs-6 ' + (duration.achieved ? 'bg-success' : 'bg-danger') + '">Tahap ' + $('<div>').text(duration.label).html() + ': ' + duration.minutes + ' mnt ' + (duration.achieved ? '&#10003;' : '&#10007; lewat target') + '</span>'
+                ? '<span class="lx-pill ' + (duration.achieved ? 'lx-pill-green' : 'lx-pill-red') + '" style="font-size: 13px;">Tahap ' + $('<div>').text(duration.label).html() + ': ' + duration.minutes + ' mnt ' + (duration.achieved ? '&#10003;' : '&#10007; lewat target') + '</span>'
                 : '');
             bootstrap.Modal.getOrCreateInstance(document.getElementById('stageModal')).show();
             notifyDevice();

@@ -7,11 +7,14 @@
     <title>LASMONO - Yardman Scanner</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php $this->load->view('partials/theme'); ?>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        :root { --ink: #0b1220; --ink-2: #131c2e; --blue: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444; }
-        body { background: #eef2f7; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        :root { --ink: #0b1220; --ink-2: #131c2e; --blue: #3b5bfd; --green: #10b981; --amber: #f59e0b; --red: #ef4444; }
+        .top { position: relative; overflow: hidden; }
+        .top::before { content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%; background: #3b5bfd; filter: blur(90px); opacity: .35; top: -150px; right: -80px; }
+        .top > * { position: relative; z-index: 1; }
         .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
 
         /* Header + panel kamera gelap ala aplikasi kamera */
@@ -92,10 +95,12 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="d-flex align-items-center gap-2">
-                        <h5 class="fw-bold mb-0">LASMONO</h5>
-                        <span class="badge bg-warning text-dark fw-bold brand-badge">YARDMAN PRO</span>
+                        <span class="lx-logo" style="width: 36px; height: 36px; font-size: 15px;"><i class="fas fa-cubes-stacked"></i></span>
+                        <div>
+                            <div class="d-flex align-items-center gap-2"><span class="lx-brand">LASMONO</span><span class="badge bg-warning text-dark fw-bold brand-badge">YARDMAN</span></div>
+                            <small style="color: #94a3b8;"><?= html_escape($this->session->userdata('name')); ?></small>
+                        </div>
                     </div>
-                    <small class="text-secondary"><?= html_escape($this->session->userdata('name')); ?></small>
                 </div>
                 <a href="<?= base_url('auth/logout'); ?>" class="icon-btn" title="Keluar"><i class="fas fa-power-off"></i></a>
             </div>

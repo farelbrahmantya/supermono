@@ -7,181 +7,71 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <?php $this->load->view('partials/theme'); ?>
     <style>
-        :root {
-            --bg-main: #f8fafc;
-            --header-dark: #0f172a;
-            --accent-gate-in: #059669;
-            --accent-gate-out: #dc2626;
-            --card-border: #e2e8f0;
-        }
+        body { min-height: 100vh; display: flex; flex-direction: column; }
 
-        body {
-            background-color: var(--bg-main);
-            color: #1e293b;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+        /* Banner mode terminal */
+        .mode-banner { position: relative; overflow: hidden; border-radius: 22px; padding: 22px 28px; color: #fff; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 16px 36px rgba(15, 23, 42, .12); }
+        .mode-banner::after { content: ""; position: absolute; right: -60px; top: -80px; width: 280px; height: 280px; border-radius: 50%; background: rgba(255, 255, 255, .12); }
+        .mode-banner > * { position: relative; z-index: 1; }
+        .mode-banner.gate-in { background: linear-gradient(135deg, #059669 0%, #0d9488 100%); }
+        .mode-banner.gate-out { background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); }
+        .mode-banner.control-tower { background: var(--lx-grad); }
+        .mode-icon { width: 58px; height: 58px; border-radius: 18px; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .25); display: inline-flex; align-items: center; justify-content: center; font-size: 24px; }
+        .live-chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .25); padding: 8px 14px; border-radius: 50px; font-size: 13px; font-weight: 700; }
+        .live-chip i { color: #86efac; animation: lx-pulse 1.6s infinite; }
 
-        /* Top Bar */
-        .gate-navbar {
-            background-color: var(--header-dark);
-            color: #ffffff;
-            padding: 16px 32px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        }
+        /* Kartu pemindai */
+        .scanner-card, .recent-card { background: #fff; border: 1px solid var(--lx-border); border-radius: 22px; box-shadow: var(--lx-shadow); }
+        .scanner-card { padding: 36px; text-align: center; }
+        .recent-card { padding: 22px; }
+        .scan-icon { width: 76px; height: 76px; border-radius: 24px; background: #eef2ff; color: var(--lx-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 14px; }
+        .barcode-box-wrapper { position: relative; max-width: 600px; margin: 0 auto; }
+        .barcode-input { background: #f8fafc; border: 2px dashed #cbd5e1; color: var(--lx-text); font-size: 26px; font-weight: 800; text-align: center; border-radius: 18px; padding: 22px; letter-spacing: 4px; text-transform: uppercase; transition: all .2s ease; }
+        .barcode-input::placeholder { color: #b6c0d1; letter-spacing: 6px; }
+        .barcode-input:focus { background: #fff; border: 2px solid var(--lx-primary); box-shadow: 0 0 0 6px rgba(59, 91, 253, .12); outline: none; }
+        .laser-line-subtle { position: absolute; bottom: 10px; left: 15%; width: 70%; height: 3px; border-radius: 3px; background: var(--lx-grad); box-shadow: 0 0 12px rgba(59, 91, 253, .6); animation: pulseLaser 2s infinite ease-in-out; }
+        @keyframes pulseLaser { 0%, 100% { opacity: .25; transform: scaleX(.8); } 50% { opacity: 1; transform: scaleX(1); } }
+        .scan-tips { display: inline-flex; gap: 18px; color: var(--lx-muted); font-size: 13px; font-weight: 600; }
+        .scan-tips i { color: var(--lx-success); }
 
-        .brand-pill {
-            background: #2563eb;
-            color: #fff;
-            font-weight: 800;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            letter-spacing: 0.5px;
-        }
+        .status-toast { border-radius: 16px; font-size: 18px; padding: 16px 22px; border: none; }
+        .alert-success.status-toast { background: #ecfdf5; color: #047857 !important; }
+        .alert-warning.status-toast { background: #fffbeb; color: #92400e !important; }
+        .alert-danger.status-toast { background: #fef2f2; color: #b91c1c !important; }
 
-        /* Mode Indicator Banner */
-        .mode-banner {
-            border-radius: 16px;
-            padding: 20px 28px;
-            color: white;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
+        /* Panel kitir */
+        #kitirPanel { background: linear-gradient(180deg, #f8faff, #fff); border: 1px solid #dbe3ff !important; border-radius: 20px !important; padding: 20px !important; }
+        #kitirPanel .table td { border-color: #eef1f7; padding: 8px 4px; }
 
-        .mode-banner.gate-in {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-        }
-
-        .mode-banner.gate-out {
-            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        }
-
-        .mode-banner.control-tower {
-            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        }
-
-        /* Scanner Main Card */
-        .scanner-card {
-            background: #ffffff;
-            border-radius: 20px;
-            border: 1px solid var(--card-border);
-            padding: 36px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Animated Barcode Box */
-        .barcode-box-wrapper {
-            position: relative;
-            max-width: 580px;
-            margin: 0 auto;
-        }
-
-        .barcode-input {
-            background: #f8fafc;
-            border: 3px solid #cbd5e1;
-            color: #0f172a;
-            font-size: 28px;
-            font-weight: 800;
-            text-align: center;
-            border-radius: 16px;
-            padding: 20px;
-            letter-spacing: 3px;
-            transition: all 0.25s ease;
-            text-transform: uppercase;
-        }
-
-        .barcode-input:focus {
-            background: #ffffff;
-            border-color: #2563eb;
-            color: #0f172a;
-            box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.15);
-            outline: none;
-        }
-
-        /* Laser Line Indicator */
-        .laser-line-subtle {
-            position: absolute;
-            bottom: 0;
-            left: 10%;
-            width: 80%;
-            height: 3px;
-            background: #2563eb;
-            border-radius: 2px;
-            box-shadow: 0 0 8px #2563eb;
-            animation: pulseLaser 2s infinite ease-in-out;
-        }
-
-        @keyframes pulseLaser {
-            0% { opacity: 0.2; transform: scaleX(0.8); }
-            50% { opacity: 1; transform: scaleX(1); }
-            100% { opacity: 0.2; transform: scaleX(0.8); }
-        }
-
-        /* Alert Display */
-        .status-toast {
-            border-radius: 14px;
-            font-size: 18px;
-            padding: 16px 24px;
-            border: none;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-        }
-
-        /* Recent Activity Table */
-        .recent-card {
-            background: #ffffff;
-            border-radius: 20px;
-            border: 1px solid var(--card-border);
-            padding: 24px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-        }
-
-        .table-custom th {
-            background-color: #f1f5f9;
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: none;
-            padding: 12px 16px;
-        }
-
-        .table-custom td {
-            padding: 14px 16px;
-            vertical-align: middle;
-            font-size: 14px;
-            border-bottom: 1px solid #f1f5f9;
-        }
+        /* Tabel */
+        .table-custom { margin: 0; }
+        .table-custom th { background: #f8fafc; color: var(--lx-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--lx-border); padding: 12px 14px; }
+        .table-custom td { padding: 13px 14px; vertical-align: middle; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+        #pendingGateInBody tr[data-queue]:hover td { background: #f5f7ff; }
+        .section-title { font-weight: 800; font-size: 16px; }
+        .section-title i { width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; margin-right: 8px; }
     </style>
 </head>
 <body>
 
     <!-- Top Navbar -->
-    <header class="gate-navbar d-flex justify-content-between align-items-center">
+    <header class="lx-topbar d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <span class="brand-pill">LAS</span>
+            <span class="lx-logo"><i class="fas fa-cubes-stacked"></i></span>
             <div>
-                <h5 class="fw-bold mb-0 text-white">LASMONO Security Terminal</h5>
-                <small class="text-light opacity-75" style="font-size: 12px;">Sistem Otomasi Gerbang & Transparansi FIFO Depo</small>
+                <div class="lx-brand">LASMONO <span class="fw-semibold" style="color: #94a3b8;">Security Terminal</span></div>
+                <div class="lx-sub">Otomasi gerbang &amp; transparansi FIFO depo</div>
             </div>
         </div>
-        <div class="d-flex align-items-center gap-3">
-            <div class="text-end me-2 d-none d-md-block">
-                <small class="d-block text-muted" style="font-size: 11px;">Petugas Aktif</small>
-                <span class="fw-bold text-light" style="font-size: 14px;"><?= html_escape($this->session->userdata('name')); ?></span>
-            </div>
-            <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold">
-                <i class="fas fa-sign-out-alt me-1"></i> Logout
-            </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="lx-user d-none d-md-inline-flex">
+                <i class="fas fa-user-shield" style="color: #a5b4fc;"></i>
+                <span><span style="color: #94a3b8;">Petugas</span> <b><?= html_escape($this->session->userdata('name')); ?></b></span>
+                <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
+            </span>
+            <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn d-md-none" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
         </div>
     </header>
 
@@ -191,30 +81,26 @@
             <div class="col-12">
                 <?php 
                     $modeClass = 'gate-in';$modeIcon = 'fa-door-open';
-                    $modeTitle = 'GATE IN TERMINAL (GERBANG MASUK)';$modeDesc = 'Mode Scan Pemindaian Truk Masuk Area Depo';
+                    $modeTitle = 'Gate In Terminal';$modeDesc = 'Gerbang masuk: scan barcode kitir, pilih truk, konfirmasi';
 
                     if ($role == 'GATE_OUT') {
                         $modeClass = 'gate-out';$modeIcon = 'fa-door-closed';
-                        $modeTitle = 'GATE OUT TERMINAL (GERBANG KELUAR)';$modeDesc = 'Mode Scan Pemindaian Penyelesaian Servis & Keluar Depo';
+                        $modeTitle = 'Gate Out Terminal';$modeDesc = 'Gerbang keluar: scan barcode di HP supir setelah survey selesai';
                     } elseif ($role == 'CONTROL_TOWER') {
                         $modeClass = 'control-tower';$modeIcon = 'fa-desktop';
-                        $modeTitle = 'SUPERVISOR MASTER TERMINAL';$modeDesc = 'Akses Penuh Pemindaian Gate In & Gate Out';
+                        $modeTitle = 'Supervisor Master Terminal';$modeDesc = 'Akses Penuh Pemindaian Gate In & Gate Out';
                     }
                 ?>
                 <div class="mode-banner <?= $modeClass; ?>">
                     <div class="d-flex align-items-center gap-3">
-                        <div class="bg-white text-dark rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 54px; height: 54px;">
-                            <i class="fas <?= $modeIcon; ?> fa-2x"></i>
-                        </div>
+                        <span class="mode-icon"><i class="fas <?= $modeIcon; ?>"></i></span>
                         <div>
                             <h4 class="fw-bold mb-0"><?= $modeTitle; ?></h4>
-                            <small class="opacity-90"><?= $modeDesc; ?></small>
+                            <small style="opacity: .9;"><?= $modeDesc; ?></small>
                         </div>
                     </div>
                     <div class="d-none d-lg-flex align-items-center gap-3">
-                        <span class="badge bg-white text-dark fw-bold px-3 py-2 rounded-pill" style="font-size: 13px;">
-                            <i class="fas fa-circle text-success me-1"></i> SCANNER STABLE
-                        </span>
+                        <span class="live-chip"><i class="fas fa-circle" style="font-size: 8px;"></i> Scanner siap</span>
                     </div>
                 </div>
             </div>
@@ -229,16 +115,14 @@
                     <div id="scanResult" style="display:none;" class="alert status-toast fw-bold mb-4"></div>
 
                     <div class="mb-4">
-                        <div class="d-inline-flex p-3 bg-light rounded-circle text-primary mb-3">
-                            <i class="fas fa-barcode fa-3x"></i>
-                        </div>
+                        <span class="scan-icon"><i class="fas fa-barcode"></i></span>
                         <h4 class="fw-bold text-dark mb-1"><?= $role == 'GATE_OUT' ? 'Arahkan Scanner ke Barcode di HP Supir' : 'Arahkan Scanner ke Barcode Kitir'; ?></h4>
                         <p class="text-muted small mb-0"><?= $role == 'GATE_OUT' ? 'Barcode supir muncul setelah Gate In dan berisi data container' : 'Gate In: scan barcode kitir (contoh Z02155544), lalu pilih truk dan konfirmasi'; ?></p>
                     </div>
 
                     <!-- Input Box -->
                     <div class="barcode-box-wrapper mb-4">
-                        <input type="text" id="gateBarcodeInput" class="form-control barcode-input" placeholder="READY TO SCAN..." autofocus autocomplete="off">
+                        <input type="text" id="gateBarcodeInput" class="form-control barcode-input" placeholder="SIAP SCAN" autofocus autocomplete="off">
                         <div class="laser-line-subtle"></div>
                     </div>
 
@@ -263,9 +147,9 @@
                         <small class="text-muted d-block text-center mt-1">atau tekan Enter</small>
                     </div>
 
-                    <div class="d-flex justify-content-center align-items-center gap-4 text-muted small">
-                        <span><i class="fas fa-keyboard me-1"></i> Auto-Focus Active</span>
-                        <span><i class="fas fa-check-circle text-success me-1"></i> Fast USB/Wireless Input</span>
+                    <div class="scan-tips justify-content-center">
+                        <span><i class="fas fa-circle-check me-1"></i> Fokus otomatis</span>
+                        <span><i class="fas fa-circle-check me-1"></i> Scanner USB / wireless</span>
                     </div>
                 </div>
             </div>
@@ -274,10 +158,10 @@
             <div class="col-lg-5">
                 <div class="recent-card h-100">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="fw-bold mb-0 text-dark">
-                            <i class="fas fa-history text-primary me-2"></i> Transaksi Terakhir Diproses
+                        <h6 class="section-title mb-0">
+                            <i class="fas fa-clock-rotate-left" style="background: #eef2ff; color: var(--lx-primary);"></i>Transaksi Terakhir
                         </h6>
-                        <span class="badge bg-primary-subtle text-primary fw-bold" id="totalProcessedCount">0 Truk Hari Ini</span>
+                        <span class="lx-pill lx-pill-blue" id="totalProcessedCount">0 Truk Hari Ini</span>
                     </div>
 
                     <div class="table-responsive">
@@ -309,10 +193,10 @@
                 <div class="col-lg-6">
                     <div class="recent-card">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="fw-bold mb-0 text-dark">
-                                <i class="fas fa-hourglass-half text-warning me-2"></i> Pending Gate In (Belum Di-scan)
+                            <h6 class="section-title mb-0">
+                                <i class="fas fa-hourglass-half" style="background: #fef3c7; color: #d97706;"></i>Antre Gate In <small class="text-secondary fw-semibold">(klik untuk memilih)</small>
                             </h6>
-                            <span class="badge bg-warning-subtle text-dark fw-bold" id="pendingGateInCount">0 Truk</span>
+                            <span class="lx-pill lx-pill-amber" id="pendingGateInCount">0 Truk</span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-custom align-middle mb-0">
@@ -333,10 +217,10 @@
                 <div class="col-lg-6">
                     <div class="recent-card">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h6 class="fw-bold mb-0 text-dark">
-                                <i class="fas fa-hourglass-end text-warning me-2"></i> Pending Gate Out (Selesai di Yard)
+                            <h6 class="section-title mb-0">
+                                <i class="fas fa-flag-checkered" style="background: #dcfce7; color: #059669;"></i>Siap Gate Out
                             </h6>
-                            <span class="badge bg-warning-subtle text-dark fw-bold" id="pendingGateOutCount">0 Truk</span>
+                            <span class="lx-pill lx-pill-green" id="pendingGateOutCount">0 Truk</span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-custom align-middle mb-0">
@@ -558,7 +442,7 @@
             let now = new Date();
             let timeStr = (now.getHours()<10?'0':'') + now.getHours() + ':' + (now.getMinutes()<10?'0':'') + now.getMinutes() + ':' + (now.getSeconds()<10?'0':'') + now.getSeconds();
 
-            let statusBadge = '<span class="badge bg-success">SUCCESS</span>';
+            let statusBadge = '<span class="lx-pill lx-pill-green"><i class="fas fa-check"></i> Berhasil</span>';
 
             let newRow = `
                 <tr>

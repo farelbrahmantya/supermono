@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,62 +7,96 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <?php $this->load->view('partials/theme'); ?>
     <style>
-        body { background-color: #f4f6f9; color: #2b2d42; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .navbar-custom { background-color: #0b1e38; padding: 15px 30px; }
-        .card-kpi { background: #ffffff; border-radius: 12px; border: none; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        .card-section { background: #ffffff; border-radius: 12px; border: none; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        .icon-kpi-wrapper { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
-        .grid-density { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-        .density-box { padding: 10px 4px; border-radius: 4px; text-align: center; font-weight: 600; font-size: 11px; }
-        .density-low { background-color: #72efdd; color: #10393b; }
-        .density-medium { background-color: #ffd166; color: #433203; }
-        .density-high { background-color: #ef476f; color: #ffffff; }
-        .table-custom th { background-color: #f8f9fa; color: #6c757d; font-size: 13px; font-weight: 600; border-bottom: 2px solid #edf2f7; }
-        .table-custom td { padding: 14px 12px; font-size: 14px; color: #2d3748; vertical-align: middle; }
-        .badge-pill-status { border-radius: 20px; padding: 6px 14px; font-weight: 600; font-size: 12px; }
-        .badge-yard { background-color: #3b82f6; color: #ffffff; }
-        .badge-waiting { background-color: #f59e0b; color: #ffffff; }
-        .badge-over-sla { background-color: #ef476f; color: #ffffff; animation: pulse 1.5s infinite; }
-        .stage-card { background: #ffffff; border-radius: 12px; padding: 16px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); cursor: pointer; border: 2px solid transparent; transition: all 0.15s ease; }
-        .stage-card:hover { border-color: #cbd5e1; }
-        .stage-card.active { border-color: #2563eb; background: #eff6ff; }
-        .stage-card.has-overdue { border-left: 6px solid #ef476f; }
-        .stage-late { color: #ef476f; font-weight: 700; }
-        .sos-active { animation: pulse 1s infinite; box-shadow: 0 0 0 4px rgba(239, 71, 111, 0.35); }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        /* Tema gelap "ruang kendali" untuk layar monitor Control Tower */
+        :root { --ct-bg: #0b1220; --ct-card: #111a2e; --ct-card-2: #16213a; --ct-line: rgba(148, 163, 184, .12); --ct-text: #e2e8f0; --ct-muted: #8b9bb4; }
+        body { background: var(--ct-bg); color: var(--ct-text); background-image: radial-gradient(circle at 10% -10%, rgba(59, 91, 253, .18), transparent 40%), radial-gradient(circle at 100% 0%, rgba(109, 74, 255, .14), transparent 35%); background-attachment: fixed; }
+        .text-muted, .text-secondary { color: var(--ct-muted) !important; }
+        .lx-topbar { background: rgba(11, 18, 32, .82); backdrop-filter: blur(12px); border-bottom: 1px solid var(--ct-line); }
+        .section-label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ct-muted); margin-bottom: 12px; }
+        .section-label small { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+        .card-kpi, .card-section, .stage-card { background: linear-gradient(180deg, var(--ct-card-2), var(--ct-card)); border: 1px solid var(--ct-line); border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+        .card-kpi { padding: 20px; height: 100%; }
+        .card-kpi h2, .card-kpi h3 { color: #fff; font-variant-numeric: tabular-nums; }
+        .card-section { padding: 22px; }
+        .card-section h5 { color: #fff !important; }
+        .icon-kpi-wrapper { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+        .stage-card { padding: 16px 18px; cursor: pointer; transition: all .15s ease; height: 100%; }
+        .stage-card:hover { border-color: rgba(129, 140, 248, .45); transform: translateY(-2px); }
+        .stage-card.active { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129, 140, 248, .25), 0 10px 30px rgba(0, 0, 0, .25); }
+        .stage-card.has-overdue { box-shadow: inset 4px 0 0 #ef4444, 0 10px 30px rgba(0, 0, 0, .25); }
+        .stage-card h3 { color: #fff; }
+        .stage-late { color: #f87171 !important; font-weight: 700; }
+
+        /* Heatmap */
+        .grid-density { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .density-box { padding: 11px 4px; border-radius: 10px; text-align: center; font-weight: 700; font-size: 12px; border: 1px solid transparent; }
+        .density-low { background: rgba(16, 185, 129, .12); color: #6ee7b7; border-color: rgba(16, 185, 129, .2); }
+        .density-medium { background: rgba(245, 158, 11, .18); color: #fcd34d; border-color: rgba(245, 158, 11, .35); }
+        .density-high { background: rgba(239, 68, 68, .85); color: #fff; box-shadow: 0 0 16px rgba(239, 68, 68, .45); }
+
+        /* Tabel antrean */
+        .table-custom { --bs-table-bg: transparent; margin: 0; }
+        .table-custom th { background: transparent; color: var(--ct-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid var(--ct-line); white-space: nowrap; }
+        .table-custom td { padding: 14px 10px; font-size: 14px; color: var(--ct-text); vertical-align: middle; border-color: var(--ct-line); }
+        .table-custom tbody tr:hover td { background: rgba(255, 255, 255, .02); }
+        .badge-pill-status { border-radius: 50px; padding: 6px 12px; font-weight: 700; font-size: 12px; }
+        .badge-yard { background: rgba(59, 91, 253, .18); color: #a5b4fc; }
+        .badge-waiting { background: rgba(245, 158, 11, .16); color: #fcd34d; }
+        .badge-over-sla { background: rgba(239, 68, 68, .9); color: #fff; animation: lx-pulse 1.5s infinite; }
+        .badge.bg-light { background: rgba(255, 255, 255, .08) !important; color: var(--ct-text) !important; border-color: var(--ct-line) !important; }
+
+        /* Tombol header */
+        .btn-ct { background: rgba(255, 255, 255, .06); border: 1px solid var(--ct-line); color: #e2e8f0; font-size: 13px; padding: 8px 14px; border-radius: 12px; }
+        .btn-ct:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+        #sosButton { border-radius: 12px; font-size: 13px; padding: 8px 14px; background: linear-gradient(135deg, #ef4444, #dc2626); border: none; }
+        .sos-active { animation: lx-pulse 1s infinite; box-shadow: 0 0 0 4px rgba(239, 68, 68, .35); }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 4px rgba(52, 211, 153, .18); animation: lx-pulse 1.6s infinite; display: inline-block; }
+        .modal-content { background: var(--ct-card); border: 1px solid var(--ct-line); }
+        #sosTableBody td, #queueTableBody td { white-space: nowrap; }
+        #queueTableBody td:nth-child(4) { white-space: normal; }
+        #sosTableBody td:nth-child(5) { white-space: normal; min-width: 220px; }
+        .clock { font-variant-numeric: tabular-nums; font-weight: 700; color: #fff; }
     </style>
 </head>
 <body>
     <!-- Top Header -->
-    <div class="navbar-custom d-flex justify-content-between align-items-center text-white mb-4">
-        <div class="d-flex align-items-center">
-            <div class="bg-white text-dark fw-bold rounded p-2 me-3" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #0b1e38 !important;">LAS</div>
-            <h4 class="fw-bold mb-0">Control Tower LASMONO - Depo MTKI</h4>
+    <header class="lx-topbar d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <span class="lx-logo"><i class="fas fa-tower-broadcast"></i></span>
+            <div>
+                <div class="lx-brand fs-5">Control Tower <span style="color: #a5b4fc;">LASMONO</span></div>
+                <div class="lx-sub"><span class="live-dot me-1"></span> Live &middot; Depo Petikemas MTKI &middot; <span class="clock" id="ctClock"></span></div>
+            </div>
         </div>
-        <div class="d-flex align-items-center">
-            <button id="sosButton" class="btn btn-danger btn-sm me-3 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#sosModal">
-                <i class="fas fa-bell me-1"></i> SOS (<span id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>)
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button id="sosButton" class="btn btn-danger fw-bold" data-bs-toggle="modal" data-bs-target="#sosModal">
+                <i class="fas fa-bell me-1"></i> SOS <span class="badge bg-white text-danger ms-1" id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>
             </button>
-            <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-light btn-sm me-3 fw-bold"><i class="fas fa-history me-1"></i> Riwayat</a>
-            <a href="<?= base_url('yardman'); ?>" class="btn btn-warning btn-sm me-3 fw-bold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
-            <span class="me-3 text-light opacity-75 small">Admin: <?= html_escape($admin_name); ?></span>
-            <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-light btn-sm"><i class="fas fa-sign-out-alt"></i></a>
+            <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-clock-rotate-left me-1"></i> Riwayat</a>
+            <a href="<?= base_url('yardman'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
+            <span class="lx-user">
+                <i class="fas fa-user-tie" style="color: #a5b4fc;"></i> <?= html_escape($admin_name); ?>
+                <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
+            </span>
         </div>
-    </div>
+    </header>
 
     <div class="container-fluid px-4">
         <!-- KPI Cards -->
-        <h6 class="fw-bold text-muted mb-3">KPI</h6>
+        <div class="section-label">Ringkasan Hari Ini</div>
         <div class="row g-3 mb-4">
             <div class="col-md-3">
                 <div class="card-kpi d-flex align-items-center justify-content-between">
                     <div>
                         <small class="text-muted d-block mb-1">Rata-rata TAT (Turn Around Time)</small>
-                        <h2 class="fw-bold mb-0" style="color: #1e293b;"><span id="kpiTat"><?= $kpi['avg_tat']; ?></span> Menit</h2>
+                        <h2 class="fw-bold mb-0"><span id="kpiTat"><?= $kpi['avg_tat']; ?></span> Menit</h2>
                         <small class="text-muted" id="kpiTatDetail">Antre <?= $kpi['avg_wait']; ?> mnt &middot; Layanan <?= $kpi['avg_service']; ?> mnt &middot; <?= $kpi['completed_today']; ?> truk selesai</small>
                     </div>
-                    <div class="icon-kpi-wrapper" style="background-color: #ffedd5; color: #ea580c;">
+                    <div class="icon-kpi-wrapper" style="background-color: rgba(234, 88, 12, .16); color: #fdba74;">
                         <i class="fas fa-stopwatch fa-lg"></i>
                     </div>
                 </div>
@@ -71,10 +105,10 @@
                 <div class="card-kpi d-flex align-items-center justify-content-between">
                     <div>
                         <small class="text-muted d-block mb-1">Truk Antre (Luar)</small>
-                        <h2 class="fw-bold mb-0" style="color: #1e293b;" id="kpiWaiting"><?= $kpi['truck_waiting']; ?></h2>
+                        <h2 class="fw-bold mb-0" id="kpiWaiting"><?= $kpi['truck_waiting']; ?></h2>
                         <small class="text-muted"><span id="kpiExpired"><?= $kpi['truck_expired']; ?></span> antrean kedaluwarsa</small>
                     </div>
-                    <div class="icon-kpi-wrapper" style="background-color: #dbeafe; color: #2563eb;">
+                    <div class="icon-kpi-wrapper" style="background-color: rgba(59, 91, 253, .18); color: #a5b4fc;">
                         <i class="fas fa-truck fa-lg"></i>
                     </div>
                 </div>
@@ -83,10 +117,10 @@
                 <div class="card-kpi d-flex align-items-center justify-content-between">
                     <div>
                         <small class="text-muted d-block mb-1">Truk di Yard</small>
-                        <h2 class="fw-bold mb-0" style="color: #1e293b;" id="kpiInYard"><?= $kpi['truck_in_yard']; ?></h2>
+                        <h2 class="fw-bold mb-0" id="kpiInYard"><?= $kpi['truck_in_yard']; ?></h2>
                     </div>
-                    <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;">
-                        <i class="fas fa-boxes fa-lg"></i>
+                    <div class="icon-kpi-wrapper" style="background-color: rgba(245, 158, 11, .16); color: #fcd34d;">
+                        <i class="fas fa-boxes-stacked fa-lg"></i>
                     </div>
                 </div>
             </div>
@@ -94,9 +128,9 @@
                 <div class="card-kpi d-flex align-items-center justify-content-between">
                     <div>
                         <small class="text-muted d-block mb-1">Gate In (1 Jam Terakhir)</small>
-                        <h2 class="fw-bold mb-0" style="color: #1e293b;"><span id="kpiGateIn"><?= $kpi['gate_in_last_hour']; ?></span> Truk</h2>
+                        <h2 class="fw-bold mb-0"><span id="kpiGateIn"><?= $kpi['gate_in_last_hour']; ?></span> Truk</h2>
                     </div>
-                    <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #16a34a;">
+                    <div class="icon-kpi-wrapper" style="background-color: rgba(16, 185, 129, .16); color: #6ee7b7;">
                         <i class="fas fa-door-open fa-lg"></i>
                     </div>
                 </div>
@@ -104,11 +138,11 @@
         </div>
 
         <!-- KPI per Tahap hari ini: proses mana yang tidak mencapai target -->
-        <h6 class="fw-bold text-muted mb-3">KPI PER TAHAP HARI INI <small class="fw-normal">(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, truk yang sudah Gate Out)</small></h6>
+        <div class="section-label">KPI per tahap hari ini <small>(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, truk yang sudah Gate Out)</small></div>
         <div class="row g-3 mb-4" id="stageKpiCards"></div>
 
         <!-- Pending per Tahap: klik untuk menyaring tabel Live Antrean -->
-        <h6 class="fw-bold text-muted mb-3">PENDING PER TAHAP <small class="fw-normal">(klik untuk melihat detail)</small></h6>
+        <div class="section-label">Pending per tahap <small>(klik untuk melihat detail)</small></div>
         <div class="row g-3 mb-4" id="stageCards">
             <div class="col-md-6 col-xl-3">
                 <div class="stage-card" data-stage="antre" role="button" tabindex="0">
@@ -118,7 +152,7 @@
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
                             <small class="stage-overdue text-muted">Antre di luar depo</small>
                         </div>
-                        <div class="icon-kpi-wrapper" style="background-color: #e2e8f0; color: #475569;"><i class="fas fa-truck fa-lg"></i></div>
+                        <div class="icon-kpi-wrapper" style="background-color: rgba(148, 163, 184, .16); color: #cbd5e1;"><i class="fas fa-truck fa-lg"></i></div>
                     </div>
                 </div>
             </div>
@@ -130,7 +164,7 @@
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
                             <small class="stage-overdue text-muted">Gate In &rarr; masuk survey</small>
                         </div>
-                        <div class="icon-kpi-wrapper" style="background-color: #dbeafe; color: #2563eb;"><i class="fas fa-sign-in-alt fa-lg"></i></div>
+                        <div class="icon-kpi-wrapper" style="background-color: rgba(59, 91, 253, .18); color: #a5b4fc;"><i class="fas fa-sign-in-alt fa-lg"></i></div>
                     </div>
                 </div>
             </div>
@@ -142,7 +176,7 @@
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
                             <small class="stage-overdue text-muted">Masuk &rarr; selesai survey</small>
                         </div>
-                        <div class="icon-kpi-wrapper" style="background-color: #fef3c7; color: #d97706;"><i class="fas fa-search fa-lg"></i></div>
+                        <div class="icon-kpi-wrapper" style="background-color: rgba(245, 158, 11, .16); color: #fcd34d;"><i class="fas fa-search fa-lg"></i></div>
                     </div>
                 </div>
             </div>
@@ -154,7 +188,7 @@
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
                             <small class="stage-overdue text-muted">Selesai survey &rarr; Gate Out</small>
                         </div>
-                        <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #16a34a;"><i class="fas fa-sign-out-alt fa-lg"></i></div>
+                        <div class="icon-kpi-wrapper" style="background-color: rgba(16, 185, 129, .16); color: #6ee7b7;"><i class="fas fa-sign-out-alt fa-lg"></i></div>
                     </div>
                 </div>
             </div>
@@ -166,7 +200,7 @@
             <div class="col-lg-8">
                 <div class="card-section">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold mb-0" style="color: #0f172a;">Live Antrean (SLA Monitor)</h5>
+                        <h5 class="fw-bold mb-0">Live Antrean (SLA Monitor)</h5>
                         <span id="stageFilterBadge" class="badge bg-primary rounded-pill px-3 py-2" role="button" style="display:none;"></span>
                     </div>
                     <div class="table-responsive">
@@ -192,7 +226,7 @@
             <!-- Kepadatan Yard (Heatmap Matrix) -->
             <div class="col-lg-4">
                 <div class="card-section">
-                    <h5 class="fw-bold mb-4" style="color: #0f172a;">Kepadatan Yard</h5>
+                    <h5 class="fw-bold mb-4">Kepadatan Yard</h5>
                     <div id="heatmapGrid"></div>
                     <?php if (empty($heatmap)): ?>
                         <small class="text-muted d-block">Belum ada data blok yard (tabel yard_zones kosong).</small>
@@ -214,7 +248,7 @@
     <div class="modal fade" id="sosAlertModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
-                <div class="modal-header bg-danger text-white">
+                <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #ef4444, #b91c1c);">
                     <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i> SOS BARU MASUK!</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
@@ -239,15 +273,16 @@
 
     <!-- Modal SOS Reports -->
     <div class="modal fade" id="sosModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content border-0">
-                <div class="modal-header bg-danger text-white">
+                <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #ef4444, #b91c1c);">
                     <h5 class="modal-title fw-bold"><i class="fas fa-bullhorn me-2"></i> Laporan SOS Pungli & Penyerobotan</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
-                    <table class="table table-striped align-middle mb-0">
-                        <thead class="table-light">
+                    <div class="table-responsive">
+                    <table class="table table-custom align-middle mb-0">
+                        <thead>
                             <tr>
                                 <th>Waktu</th>
                                 <th>No. Antrean</th>
@@ -286,6 +321,7 @@
                             <?php endforeach; ?>
                     </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -294,6 +330,14 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const MEDIA_BASE = "<?= base_url(); ?>";
+
+        // Jam di header
+        function tickClock() {
+            let d = new Date();
+            $('#ctClock').text(d.toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        }
+        tickClock();
+        setInterval(tickClock, 1000);
         const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
         let CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
 
