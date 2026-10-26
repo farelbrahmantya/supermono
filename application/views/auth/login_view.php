@@ -36,10 +36,9 @@
         /* Pilihan kegiatan supir: wajib dipilih, tanpa pilihan bawaan */
         .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .act-grid input { position: absolute; opacity: 0; pointer-events: none; }
-        .act-grid label { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 2px solid var(--lx-border); border-radius: 14px; background: #fff; cursor: pointer; transition: .15s; line-height: 1.15; }
+        .act-grid label { position: relative; display: flex; align-items: center; gap: 10px; padding: 12px; border: 2px solid var(--lx-border); border-radius: 14px; background: #fff; cursor: pointer; transition: .15s; line-height: 1.15; }
         .act-grid label .ic { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
         .act-grid label b { display: block; font-size: 14px; }
-        .act-grid label small { color: #8a8f99; font-size: 11px; }
         .act-grid label .check { position: absolute; top: 6px; right: 8px; color: var(--lx-success); display: none; }
         .act-grid input:checked + label { border-color: var(--lx-primary); background: #fffaf0; box-shadow: 0 0 0 3px rgba(229, 167, 32, .18); }
         .act-grid input:checked + label .check { display: block; }
@@ -171,18 +170,19 @@
                                 <label class="form-label">JENIS KEGIATAN <span class="fw-normal text-muted">(sesuai kitir)</span></label>
                                 <div class="act-grid" id="actGrid">
                                     <?php
+                                        // Urutan grid 2 kolom: Import | Export, lalu Repo In | Repo Out
                                         $driver_acts = array(
-                                            'Z' => array('Repo In', 'Kontainer kosong masuk', 'fa-arrow-right-to-bracket', '#fff3d1', '#8a5a00'),
-                                            'A' => array('Import', 'Bongkar kontainer', 'fa-box-open', '#dcfce7', '#047857'),
-                                            'D' => array('Export', 'Muat kontainer ekspor', 'fa-ship', '#e0ecff', '#1d4ed8'),
-                                            'E' => array('Repo Out', 'Kontainer kosong keluar', 'fa-arrow-right-from-bracket', '#f3e8ff', '#7e22ce')
+                                            'A' => array('Import', 'fa-box-open', '#dcfce7', '#047857'),
+                                            'D' => array('Export', 'fa-ship', '#e0ecff', '#1d4ed8'),
+                                            'Z' => array('Repo In', 'fa-arrow-right-to-bracket', '#fff3d1', '#8a5a00'),
+                                            'E' => array('Repo Out', 'fa-arrow-right-from-bracket', '#f3e8ff', '#7e22ce')
                                         );
                                     ?>
                                     <?php foreach ($driver_acts as $code => $act): ?>
                                         <input type="radio" name="activity" value="<?= $code; ?>" id="act<?= $code; ?>">
                                         <label for="act<?= $code; ?>">
-                                            <span class="ic" style="background: <?= $act[3]; ?>; color: <?= $act[4]; ?>;"><i class="fas <?= $act[2]; ?>"></i></span>
-                                            <span><b><?= $act[0]; ?></b><small><?= $act[1]; ?></small></span>
+                                            <span class="ic" style="background: <?= $act[2]; ?>; color: <?= $act[3]; ?>;"><i class="fas <?= $act[1]; ?>"></i></span>
+                                            <span><b><?= $act[0]; ?></b></span>
                                             <i class="fas fa-circle-check check"></i>
                                         </label>
                                     <?php endforeach; ?>
