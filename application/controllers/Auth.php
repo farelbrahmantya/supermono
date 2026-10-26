@@ -19,46 +19,106 @@ class Auth extends MY_Controller {
 
         // Untuk Petugas: Hapus session lama agar wajib re-login saat buka tab/portal baru
         if (in_array($this->session->userdata('role'), array('YARDMAN', 'CONTROL_TOWER', 'GATE_IN', 'GATE_OUT'))) {
-            $this->session->unset_userdata(array('user_id', 'name', 'username', 'role', 'logged_in'));
+            $this->session->unset_userdata(array('user_id', 'name', 'username', 'role', 'gate_switch', 'logged_in'));
         }
 
         $this->load->view('auth/login_view');
     }
 
     // Proses Login Petugas (Gate, Yardman & Control Tower)
+    // 1. Akun lokal LASMONO (demo / cadangan)
+    // 2. User aplikasi utama perusahaan (new_general), role ditentukan dari departemen & posisi
     public function process_login_staff() {
         $username = trim($this->input->post('username'));
         $password = (string) $this->input->post('password');
 
-        $user = $this->db->get_where('users', array('username' => $username))->row();
-
+        $user = $this->db->get_where('users', array('username' => $username, 'source' => 'LOCAL'))->row();
         if ($user && password_verify($password, $user->password)) {
-            // Cegah session fixation
-            $this->session->sess_regenerate(TRUE);
+            $this->_start_staff_session($user, $user->role === 'GATE_IN' || $user->role === 'GATE_OUT' ? $user->role : NULL);
+            return;
+        }
 
-            $session_data = array(
-                'user_id'   => $user->id,
-                'name'      => $user->name,
-                'username'  => $user->username,
-                'role'      => $user->role,
-                'logged_in' => TRUE
-            );
-            $this->session->set_userdata($session_data);
-
-            if ($user->role == 'GATE_IN' || $user->role == 'GATE_OUT') {
-                redirect('gate');
-            } elseif ($user->role == 'YARDMAN') {
-                redirect('yardman');
-            } else {
-                redirect('control_tower');
+        $this->load->model('company_user_model');
+        if (!$user && $this->company_user_model->enabled()) {
+            $staff = $this->company_user_model->authenticate($username, $password);
+            if ($staff) {
+                $role = $this->company_user_model->role_for($staff);
+                if ($role === NULL) {
+                    $this->session->set_flashdata('error_staff', 'Akun ' . $staff->nama . ' (' . trim($staff->posisi) . ') tidak memiliki akses LASMONO. Hubungi Control Tower.');
+                    redirect('auth');
+                    return;
+                }
+                $this->_start_staff_session($this->_sync_company_user($staff, $role), $role === 'GATE' ? 'GATE_IN' : NULL);
+                return;
             }
-        } else {
-            $this->session->set_flashdata('error_staff', 'Username atau Password salah!');
+        }
+
+        $this->session->set_flashdata('error_staff', 'Username atau Password salah!');
+        redirect('auth');
+    }
+
+    // Security (satu akun untuk Gate In & Gate Out) berpindah mode gerbang
+    public function switch_gate($mode = '') {
+        if (!$this->session->userdata('gate_switch') || !in_array($mode, array('in', 'out'), TRUE)) {
             redirect('auth');
+            return;
+        }
+        $this->session->set_userdata('role', $mode === 'in' ? 'GATE_IN' : 'GATE_OUT');
+        redirect('gate');
+    }
+
+    private function _start_staff_session($user, $gate_role) {
+        // Cegah session fixation
+        $this->session->sess_regenerate(TRUE);
+        $role = $gate_role ? $gate_role : $user->role;
+
+        $this->session->set_userdata(array(
+            'user_id'     => $user->id,
+            'name'        => $user->name,
+            'username'    => $user->username,
+            'role'        => $role,
+            // Akun Security perusahaan boleh berpindah Gate In / Gate Out
+            'gate_switch' => $user->source === 'NEW_GENERAL' && $gate_role !== NULL,
+            'logged_in'   => TRUE
+        ));
+        $this->db->where('id', $user->id)->update('users', array('last_login_at' => $this->_now()));
+
+        if ($role == 'GATE_IN' || $role == 'GATE_OUT') {
+            redirect('gate');
+        } elseif ($role == 'YARDMAN') {
+            redirect('yardman');
+        } else {
+            redirect('control_tower');
         }
     }
 
-    // Proses Login Supir & Cek Antrean Ganda
+    // Salinan data user perusahaan di lasmono_db.users agar riwayat (petugas Gate/Yardman) tetap bernama
+    private function _sync_company_user($staff, $role) {
+        $data = array(
+            'name'       => trim($staff->nama),
+            'role'       => $role === 'GATE' ? 'GATE_IN' : $role,
+            'nik'        => $staff->nik,
+            'department' => $staff->deptnam ? trim($staff->deptnam) : $staff->kddept,
+            'position'   => trim($staff->posisi)
+        );
+
+        $user = $this->db->get_where('users', array('source' => 'NEW_GENERAL', 'ext_user_id' => $staff->user_id))->row();
+        if ($user) {
+            $this->db->where('id', $user->id)->update('users', $data);
+        } else {
+            // Username sama dengan aplikasi utama; beri awalan jika bentrok dengan akun lokal
+            $username = $this->db->get_where('users', array('username' => $staff->user))->row() ? 'ng.' . $staff->user : $staff->user;
+            $this->db->insert('users', array_merge($data, array(
+                'username'    => $username,
+                'password'    => '!',
+                'source'      => 'NEW_GENERAL',
+                'ext_user_id' => $staff->user_id,
+                'created_at'  => $this->_now()
+            )));
+        }
+        return $this->db->get_where('users', array('source' => 'NEW_GENERAL', 'ext_user_id' => $staff->user_id))->row();
+    }
+
     public function process_login_driver() {
         $phone = $this->_normalize_phone($this->input->post('driver_phone'));
         $plate = $this->_normalize_plate($this->input->post('license_plate'));

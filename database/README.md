@@ -14,6 +14,8 @@ Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5 (struktur tabel tetap sama dengan versi 
   A Import, D Export, E Repo Out). Export & Repo Out tidak melalui survey.
 - `upgrade_05_kegiatan_supir.sql`: kolom `driver_activity` (kegiatan yang dipilih supir saat
   daftar antrean; saat Gate In aktivitas tetap mengikuti kitir).
+- `upgrade_06_user_perusahaan.sql`: kolom sumber user (LOCAL / NEW_GENERAL) agar petugas bisa
+  login dengan user aplikasi utama, plus contoh perintah GRANT SELECT ke `new_general`.
 - `lasmono_db.sql`: struktur lengkap + data awal untuk instalasi baru (misalnya laptop demo).
 
 Login petugas setelah upgrade: `yardman1`, `admin_ct`, `gate_in`, `gate_out` dengan password

@@ -14,9 +14,16 @@ CREATE TABLE IF NOT EXISTS `users` (
   `username` varchar(50) NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` enum('GATE_IN','GATE_OUT','YARDMAN','CONTROL_TOWER') NOT NULL DEFAULT 'YARDMAN',
+  `source` enum('LOCAL','NEW_GENERAL') NOT NULL DEFAULT 'LOCAL',
+  `ext_user_id` int(11) DEFAULT NULL,
+  `nik` varchar(20) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `position` varchar(50) DEFAULT NULL,
   `created_at` datetime DEFAULT NULL,
+  `last_login_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_username` (`username`)
+  UNIQUE KEY `uk_username` (`username`),
+  UNIQUE KEY `uk_source_ext` (`source`, `ext_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `yard_zones` (

@@ -116,3 +116,26 @@ $db['new_sby'] = array(
 	'failover' => array(),
 	'save_queries' => TRUE
 );
+
+// Database aplikasi utama perusahaan (user & staff) untuk login petugas: hanya SELECT
+$db['new_general'] = array(
+	'dsn'	=> '',
+	'hostname' => getenv('LASMONO_DB_HOST') ?: 'localhost',
+	'username' => getenv('LASMONO_DB_USER') ?: '',
+	'password' => getenv('LASMONO_DB_PASS') ?: '',
+	'database' => 'new_general',
+	'dbdriver' => 'mysqli',
+	'dbprefix' => '',
+	'pconnect' => TRUE,
+	'db_debug' => (ENVIRONMENT !== 'production'),
+	'cache_on' => FALSE,
+	'cachedir' => '',
+	'char_set' => 'utf8',
+	'dbcollat' => 'utf8_general_ci',
+	'swap_pre' => '',
+	'encrypt' => FALSE,
+	'compress' => FALSE,
+	'stricton' => FALSE,
+	'failover' => array(),
+	'save_queries' => TRUE
+);

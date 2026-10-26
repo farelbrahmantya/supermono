@@ -41,6 +41,10 @@
         .alert-warning.status-toast { background: #fffbeb; color: #92400e !important; }
         .alert-danger.status-toast { background: #fef2f2; color: #b91c1c !important; }
 
+        .gate-switch { display: inline-flex; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); border-radius: 50px; padding: 4px; }
+        .gate-switch a { color: #cbd5e1; text-decoration: none; font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 50px; }
+        .gate-switch a.active { background: var(--lx-grad); color: var(--lx-ink); }
+
         /* Panel kitir */
         #kitirPanel { background: linear-gradient(180deg, #fffbf0, #fff); border: 1px solid #f6e2a8 !important; border-radius: 20px !important; padding: 20px !important; }
         #kitirPanel .table td { border-color: #eef1f7; padding: 8px 4px; }
@@ -66,6 +70,13 @@
             </div>
         </div>
         <div class="d-flex align-items-center gap-2">
+            <?php if ($this->session->userdata('gate_switch')): ?>
+                <!-- Akun Security: satu user untuk Gate In & Gate Out -->
+                <div class="gate-switch">
+                    <a href="<?= base_url('auth/switch_gate/in'); ?>" class="<?= $role == 'GATE_IN' ? 'active' : ''; ?>"><i class="fas fa-right-to-bracket me-1"></i>Gate In</a>
+                    <a href="<?= base_url('auth/switch_gate/out'); ?>" class="<?= $role == 'GATE_OUT' ? 'active' : ''; ?>"><i class="fas fa-right-from-bracket me-1"></i>Gate Out</a>
+                </div>
+            <?php endif; ?>
             <span class="lx-user d-none d-md-inline-flex">
                 <i class="fas fa-user-shield" style="color: #f6c64a;"></i>
                 <span><span style="color: #94a3b8;">Petugas</span> <b><?= html_escape($this->session->userdata('name')); ?></b></span>
