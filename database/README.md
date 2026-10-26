@@ -10,6 +10,8 @@ Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5 (struktur tabel tetap sama dengan versi 
   (default A-C = Depo 1, D-F = Depo 2; sesuaikan dengan kondisi lapangan).
 - `upgrade_03_principal_blok.sql`: pembagian blok per principal (pelayaran) beserta warnanya
   (Depo 1: A1-C3 ONE, A4-C5 Wan Hai; Depo 2: D1-F3 KMTC, D4-F5 CMA CGM).
+- `upgrade_04_aktivitas_kitir.sql`: kolom `activity` di antrean (huruf awal kitir: Z Repo In,
+  A Import, D Export, E Repo Out). Export & Repo Out tidak melalui survey.
 - `lasmono_db.sql`: struktur lengkap + data awal untuk instalasi baru (misalnya laptop demo).
 
 Login petugas setelah upgrade: `yardman1`, `admin_ct`, `gate_in`, `gate_out` dengan password

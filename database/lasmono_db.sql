@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   `status` enum('WAITING_GATE','IN_YARD','IN_SURVEY','AT_YARD','COMPLETED','CANCELLED') NOT NULL DEFAULT 'WAITING_GATE',
   `current_zone_id` int(11) DEFAULT NULL,
   `cp_id` bigint(20) DEFAULT NULL,
+  `activity` char(1) NOT NULL DEFAULT 'Z',
   `container_no` varchar(15) DEFAULT NULL,
   `principal` varchar(20) DEFAULT NULL,
   `container_size` varchar(30) DEFAULT NULL,
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   KEY `idx_driver_phone` (`driver_phone`),
   KEY `idx_license_plate` (`license_plate`),
   KEY `idx_cp_id` (`cp_id`),
+  KEY `idx_container_no` (`container_no`),
   CONSTRAINT `fk_queue_zone` FOREIGN KEY (`current_zone_id`) REFERENCES `yard_zones` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

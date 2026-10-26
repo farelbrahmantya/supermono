@@ -12,15 +12,65 @@ class MY_Controller extends CI_Controller {
     // Target KPI per tahap proses di dalam depo (menit)
     const STAGE_KPI_MINUTES = 5;
 
+    // Toleransi tahap pemilihan container Export (menit)
+    const EXPORT_PICK_KPI_MINUTES = 10;
+
     // Status antrean yang sedang berada di dalam depo
     protected $in_depo_statuses = array('IN_YARD', 'IN_SURVEY', 'AT_YARD');
 
-    // Tahap KPI di dalam depo: status => [kunci tahap, nama tahap, kolom waktu mulai tahap]
-    protected $stages = array(
-        'IN_YARD'   => array('gate_in',  'Gate In',          'gate_in_at'),
-        'IN_SURVEY' => array('survey',   'At Yard (Survey)', 'survey_start_at'),
-        'AT_YARD'   => array('gate_out', 'Gate Out',         'yard_scan_at')
-    );
+    // Jenis aktivitas = huruf awal barcode kitir
+    protected $activities = array('Z' => 'Repo In', 'A' => 'Import', 'D' => 'Export', 'E' => 'Repo Out');
+
+    // Aktivitas muat (container keluar depo): tanpa survey, Yardman langsung memuat container
+    protected function _is_muat($activity) {
+        return in_array($activity, array('D', 'E'), TRUE);
+    }
+
+    protected function _activity_label($activity) {
+        return isset($this->activities[$activity]) ? $this->activities[$activity] : $this->activities['Z'];
+    }
+
+    // Tahap KPI di dalam depo per aktivitas:
+    // kunci => [nama tahap, status saat tahap berjalan, kolom mulai, kolom selesai, target menit]
+    protected function _stage_plan($activity) {
+        $gate_out = array('Gate Out', 'AT_YARD', 'yard_scan_at', 'gate_out_at', self::STAGE_KPI_MINUTES);
+        if ($activity === 'D') {
+            return array(
+                'pick'     => array('Pilih & Muat Container', 'IN_YARD', 'gate_in_at', 'yard_scan_at', self::EXPORT_PICK_KPI_MINUTES),
+                'gate_out' => $gate_out
+            );
+        }
+        if ($activity === 'E') {
+            return array(
+                'load'     => array('Muat Container', 'IN_YARD', 'gate_in_at', 'yard_scan_at', self::STAGE_KPI_MINUTES),
+                'gate_out' => $gate_out
+            );
+        }
+        return array(
+            'gate_in'  => array('Gate In', 'IN_YARD', 'gate_in_at', 'survey_start_at', self::STAGE_KPI_MINUTES),
+            'survey'   => array('At Yard (Survey)', 'IN_SURVEY', 'survey_start_at', 'yard_scan_at', self::STAGE_KPI_MINUTES),
+            'gate_out' => $gate_out
+        );
+    }
+
+    // Tahap yang sedang berjalan untuk antrean: [kunci, nama, kolom mulai, target menit], NULL jika di luar depo
+    protected function _current_stage($queue) {
+        foreach ($this->_stage_plan(isset($queue->activity) ? $queue->activity : 'Z') as $key => $stage) {
+            if ($stage[1] === $queue->status) {
+                return array($key, $stage[0], $stage[2], $stage[4]);
+            }
+        }
+        return NULL;
+    }
+
+    // Target total proses (menit) = jumlah target semua tahap aktivitas
+    protected function _total_target($activity) {
+        $total = 0;
+        foreach ($this->_stage_plan($activity) as $stage) {
+            $total += $stage[4];
+        }
+        return $total;
+    }
 
     // Role yang boleh mengakses controller turunan (kosong = publik)
     protected $allowed_roles = array();
@@ -69,17 +119,17 @@ class MY_Controller extends CI_Controller {
 
     // Timer KPI: tahap yang sedang berjalan (timer besar) dan total proses sejak Gate In (timer kecil)
     protected function _timer_info($queue) {
-        if (empty($queue->gate_in_at) || !isset($this->stages[$queue->status])) {
+        $stage = $this->_current_stage($queue);
+        if (empty($queue->gate_in_at) || $stage === NULL) {
             return NULL;
         }
-        $stage   = $this->stages[$queue->status];
         $started = $queue->{$stage[2]};
 
         return array(
             'stage'                   => $stage[0],
             'stage_label'             => $stage[1],
-            'stage_target_minutes'    => self::STAGE_KPI_MINUTES,
-            'stage_remaining_seconds' => self::STAGE_KPI_MINUTES * 60 - (time() - strtotime($started)),
+            'stage_target_minutes'    => $stage[3],
+            'stage_remaining_seconds' => $stage[3] * 60 - (time() - strtotime($started)),
             'total_target_minutes'    => (int) $queue->sla_target_minutes,
             'total_remaining_seconds' => (int) $queue->sla_target_minutes * 60 - (time() - strtotime($queue->gate_in_at))
         );
@@ -87,18 +137,15 @@ class MY_Controller extends CI_Controller {
 
     // Durasi (menit) setiap tahap yang sudah dilalui, untuk ringkasan & KPI per tahap
     protected function _stage_durations($queue) {
-        $points = array(
-            array('Gate In', $queue->gate_in_at, $queue->survey_start_at),
-            array('At Yard (Survey)', $queue->survey_start_at, $queue->yard_scan_at),
-            array('Gate Out', $queue->yard_scan_at, $queue->gate_out_at)
-        );
         $result = array();
-        foreach ($points as $p) {
-            if (empty($p[1]) || empty($p[2])) {
+        foreach ($this->_stage_plan(isset($queue->activity) ? $queue->activity : 'Z') as $stage) {
+            $from = $queue->{$stage[2]};
+            $to   = $queue->{$stage[3]};
+            if (empty($from) || empty($to)) {
                 continue;
             }
-            $minutes  = round((strtotime($p[2]) - strtotime($p[1])) / 60, 1);
-            $result[] = array('label' => $p[0], 'minutes' => $minutes, 'achieved' => $minutes <= self::STAGE_KPI_MINUTES);
+            $minutes  = round((strtotime($to) - strtotime($from)) / 60, 1);
+            $result[] = array('label' => $stage[0], 'minutes' => $minutes, 'achieved' => $minutes <= $stage[4]);
         }
         return $result;
     }
@@ -137,7 +184,7 @@ class MY_Controller extends CI_Controller {
         $since_column = array('WAITING_GATE' => 'q.created_at', 'IN_YARD' => 'q.gate_in_at', 'IN_SURVEY' => 'q.survey_start_at', 'AT_YARD' => 'q.yard_scan_at');
         $column = $since_column[$status];
 
-        $sql = "SELECT q.queue_number, q.license_plate, q.container_no, z.zone_code, z.depo, TIMESTAMPDIFF(MINUTE, {$column}, ?) AS waiting_minutes
+        $sql = "SELECT q.queue_number, q.license_plate, q.container_no, q.status, q.activity, z.zone_code, z.depo, TIMESTAMPDIFF(MINUTE, {$column}, ?) AS waiting_minutes
                 FROM queue_transactions q
                 LEFT JOIN yard_zones z ON z.id = q.current_zone_id
                 WHERE q.status = ?";
@@ -151,15 +198,18 @@ class MY_Controller extends CI_Controller {
         $pending = array();
         foreach ($rows as $row) {
             $minutes = max(0, (int) $row->waiting_minutes);
+            $stage   = $this->_current_stage($row);
             $pending[] = array(
+                'activity'        => $row->activity,
+                'activity_label'  => $this->_activity_label($row->activity),
                 'queue_number'    => $row->queue_number,
                 'license_plate'   => $row->license_plate,
                 'container_no'    => $row->container_no,
                 'zone_code'       => $row->zone_code,
                 'depo'            => $row->depo,
                 'waiting_minutes' => $minutes,
-                // Antre di luar belum dihitung KPI; tahap di dalam depo target STAGE_KPI_MINUTES
-                'overdue'         => $status !== 'WAITING_GATE' && $minutes > self::STAGE_KPI_MINUTES
+                // Antre di luar belum dihitung KPI; tahap di dalam depo sesuai target tahap aktivitasnya
+                'overdue'         => $stage !== NULL && $minutes > $stage[3]
             );
         }
         return $pending;

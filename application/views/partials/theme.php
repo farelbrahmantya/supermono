@@ -86,6 +86,13 @@
     .lx-pill-red { background: #fee2e2; color: #b91c1c; }
     .lx-pill-gray { background: #f1f5f9; color: #475569; }
 
+    /* Label aktivitas kitir: Z Repo In, A Import, D Export, E Repo Out */
+    .act-tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; background: #f1f2f4; color: #4b5059; white-space: nowrap; }
+    .act-tag.act-Z { background: #fff3d1; color: var(--lx-gold-text); }
+    .act-tag.act-A { background: #dcfce7; color: #047857; }
+    .act-tag.act-D { background: #e0ecff; color: #1d4ed8; }
+    .act-tag.act-E { background: #f3e8ff; color: #7e22ce; }
+
     /* Tabel */
     .lx-table { margin: 0; }
     .lx-table thead th { background: #f8fafc; color: var(--lx-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid var(--lx-border); padding: 12px 14px; white-space: nowrap; }

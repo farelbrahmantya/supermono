@@ -70,6 +70,10 @@
         .step-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 50px; }
         .step-1 { background: #fff3d1; color: #8a5a00; }
         .step-2 { background: #d1fae5; color: #047857; }
+        .step-3 { background: #e0ecff; color: #1d4ed8; }
+        .pick-box { background: #f5f8ff; border: 1px dashed #b9cdf5; border-radius: 14px; padding: 12px; }
+        .pick-box input { font-size: 20px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+        .pick-result { font-size: 13px; }
         .container-no { font-size: 30px; font-weight: 800; letter-spacing: .5px; color: #0f172a; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .info-grid div { background: #f8fafc; border-radius: 12px; padding: 8px 10px; }
@@ -112,7 +116,7 @@
             <!-- Ringkasan pending (ketuk untuk melihat daftar) -->
             <div class="stat-chips">
                 <button type="button" class="stat-chip" id="chipWaiting" data-bs-toggle="offcanvas" data-bs-target="#pendingSheet">
-                    <div class="num" id="countWaiting">0</div><small>Menunggu masuk survey</small>
+                    <div class="num" id="countWaiting">0</div><small>Menunggu survey / muat</small>
                 </button>
                 <button type="button" class="stat-chip" id="chipSurvey" data-bs-toggle="offcanvas" data-bs-target="#pendingSheet">
                     <div class="num" id="countSurvey">0</div><small>Sedang survey</small>
@@ -136,11 +140,11 @@
                 </div>
             </div>
 
-            <div class="small text-center mt-2" style="color: #a9adb6;"><i class="fas fa-circle-info me-1"></i> Jarak ideal 20&ndash;30 cm dari layar HP supir</div>
+            <div class="small text-center mt-2" style="color: #a9adb6;"><i class="fas fa-circle-info me-1"></i> Scan QR supir atau barcode kitir &middot; jarak ideal 20&ndash;30 cm</div>
 
             <!-- Input manual -->
             <div class="manual">
-                <input type="text" id="manualQueueInput" class="form-control" placeholder="Ketik no. antrean, contoh A-20261025-001" autocomplete="off">
+                <input type="text" id="manualQueueInput" class="form-control" placeholder="No. antrean / kitir, contoh D1578461" autocomplete="off">
                 <button type="button" id="btnManualSubmit" class="btn btn-primary fw-bold px-3" style="border-radius: 12px;"><i class="fas fa-arrow-right"></i></button>
             </div>
         </div>
@@ -178,9 +182,19 @@
                     <div style="grid-column: span 2;"><small>Customer</small><b id="sheetCustomer"></b></div>
                 </div>
 
-                <!-- Pilih Depo & Blok (hanya langkah 2) -->
+                <!-- Export: nomor container dipilih customer & Yardman di lapangan, dicek ke database depo -->
+                <div id="containerPicker" class="pick-box mb-3" style="display:none;">
+                    <div class="fw-bold small text-secondary mb-2">NOMOR CONTAINER YANG DIMUAT</div>
+                    <div class="d-flex gap-2">
+                        <input type="text" id="pickContainerInput" class="form-control" placeholder="ONEU1234567" maxlength="13" autocomplete="off">
+                        <button type="button" class="btn btn-primary fw-bold px-3" id="btnCheckContainer">Cek</button>
+                    </div>
+                    <div class="pick-result mt-2" id="pickResult"></div>
+                </div>
+
+                <!-- Pilih Depo & Blok (survey selesai / muat container) -->
                 <div id="zonePicker" style="display:none;">
-                    <div class="fw-bold small text-secondary mb-2">PILIH DEPO &amp; BLOK PENEMPATAN</div>
+                    <div class="fw-bold small text-secondary mb-2" id="zonePickerTitle">PILIH DEPO &amp; BLOK PENEMPATAN</div>
                     <div class="depo-tabs mb-2" id="depoTabs"></div>
                     <div class="block-grid mb-2" id="blockGrid"></div>
                     <div class="principal-note alert alert-warning mb-3" id="principalNote" style="display:none;"></div>
@@ -198,8 +212,10 @@
     <div class="offcanvas offcanvas-bottom sheet" tabindex="-1" id="pendingSheet">
         <div class="grabber"></div>
         <div class="offcanvas-body pt-3">
-            <div class="fw-bold small text-secondary mb-1"><i class="fas fa-hourglass-half me-1"></i> MENUNGGU MASUK SURVEY</div>
+            <div class="fw-bold small text-secondary mb-1"><i class="fas fa-hourglass-half me-1"></i> MENUNGGU MASUK SURVEY (REPO IN / IMPORT)</div>
             <div id="pendingWaitingList" class="mb-3"></div>
+            <div class="fw-bold small text-secondary mb-1"><i class="fas fa-dolly me-1"></i> MENUNGGU MUAT (EXPORT / REPO OUT)</div>
+            <div id="pendingMuatList" class="mb-3"></div>
             <div class="fw-bold small text-secondary mb-1"><i class="fas fa-search me-1"></i> SEDANG SURVEY (BELUM SELESAI)</div>
             <div id="pendingSurveyList"></div>
         </div>
@@ -290,7 +306,8 @@
                 return;
             }
             if (!scanner) {
-                scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
+                // QR supir + barcode garis di kertas kitir
+                scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] });
             }
             let useDevice = cameraIndex >= 0 && cameras[cameraIndex];
             let source = useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: 'environment' };
@@ -392,8 +409,9 @@
 
         function onDecoded(text) {
             if (busy) return;
-            let match = String(text).toUpperCase().match(/A-\d{8}-\d{3}/);
-            let code = match ? match[0] : String(text).trim().toUpperCase();
+            let raw = String(text).trim().toUpperCase();
+            let match = raw.match(/A-\d{8}-\d{3}/);
+            let code = match ? match[0] : raw;
             // QR yang baru diproses masih di depan kamera: abaikan beberapa detik
             if (code === lastDone.code && Date.now() - lastDone.time < 6000) return;
             $('#cam').addClass('detected');
@@ -404,6 +422,7 @@
         const sheet = new bootstrap.Offcanvas(document.getElementById('confirmSheet'));
         let current = null;
         let selectedZone = '';
+        let pickedContainer = '';
 
         function sheetMessage(type, text) {
             $('#sheetMessage').removeClass('alert-danger alert-warning alert-success').addClass('alert-' + type)
@@ -428,6 +447,10 @@
 
         function renderSheet(res) {
             selectedZone = '';
+            pickedContainer = '';
+            $('#containerPicker').hide();
+            $('#pickContainerInput').val('');
+            $('#pickResult').html('');
             if (res.status !== 'success') {
                 feedback(false);
                 $('#sheetTruck').hide();
@@ -445,11 +468,26 @@
             $('#sheetPrincipal').text(q.principal || '-');
             $('#sheetSize').text(q.container_size || '-');
             $('#sheetCustomer').text(q.customer || '-');
-            $('#stageTime').html('<i class="fas fa-stopwatch me-1"></i>' + esc(q.stage_minutes) + ' mnt di tahap ini')
-                .toggleClass('text-danger fw-bold', q.stage_minutes > STAGE_KPI)
-                .toggleClass('text-muted', q.stage_minutes <= STAGE_KPI);
+            let target = q.stage_target || STAGE_KPI;
+            $('#stageTime').html('<i class="fas fa-stopwatch me-1"></i>' + esc(q.stage_minutes) + ' / ' + esc(target) + ' mnt di tahap ini')
+                .toggleClass('text-danger fw-bold', q.stage_minutes > target)
+                .toggleClass('text-muted', q.stage_minutes <= target);
+            $('#zonePickerTitle').html(res.step === 3 ? 'PILIH DEPO &amp; BLOK PENGAMBILAN CONTAINER' : 'PILIH DEPO &amp; BLOK PENEMPATAN');
 
-            if (res.step === 1) {
+            if (res.step === 3) {
+                // Export / Repo Out: tanpa survey, langsung muat container
+                $('#stepPill').attr('class', 'step-pill step-3').html('<i class="fas fa-dolly"></i> MUAT CONTAINER &middot; ' + esc(String(q.activity_label).toUpperCase()));
+                $('#principalNote').hide();
+                if (q.need_container) {
+                    $('#sheetContainer').html('<span class="text-muted fs-5">Pilih container</span>');
+                    $('#containerPicker').show();
+                }
+                renderZonePicker();
+                $('#zonePicker').toggle(Object.keys(ZONES).length > 0);
+                $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> SUBMIT MUAT').removeClass('btn-dark btn-primary').addClass('btn-success')
+                    .data('action', 'confirm');
+                updateConfirmState();
+            } else if (res.step === 1) {
                 $('#stepPill').attr('class', 'step-pill step-1').html('<i class="fas fa-sign-in-alt"></i> LANGKAH 1 &middot; MASUK SURVEY');
                 $('#zonePicker').hide();
                 $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> MULAI SURVEY').removeClass('btn-dark btn-success').addClass('btn-primary').prop('disabled', false).data('action', 'confirm');
@@ -505,7 +543,53 @@
             $('#principalNote').toggle(!!mismatch).html(mismatch
                 ? '<i class="fas fa-triangle-exclamation me-1"></i> Blok ' + esc(zone.code) + ' untuk principal <b>' + esc(zone.principal) + '</b>, container ini <b>' + esc(current.queue.principal) + '</b>. Pastikan penempatan benar.'
                 : '');
-            $('#btnSheetConfirm').prop('disabled', false).html('<i class="fas fa-check me-1"></i> SELESAI SURVEY &middot; BLOK ' + esc(selectedZone));
+            if (current.step === 3) {
+                updateConfirmState();
+            } else {
+                $('#btnSheetConfirm').prop('disabled', false).html('<i class="fas fa-check me-1"></i> SELESAI SURVEY &middot; BLOK ' + esc(selectedZone));
+            }
+        });
+
+        // Tombol submit muat aktif jika blok sudah dipilih & (Export) container sudah lolos cek
+        function updateConfirmState() {
+            if (!current || current.step !== 3) return;
+            let needZone = Object.keys(ZONES).length > 0;
+            let ready = (!needZone || selectedZone) && (!current.queue.need_container || pickedContainer);
+            $('#btnSheetConfirm').prop('disabled', !ready).html('<i class="fas fa-check me-1"></i> SUBMIT MUAT' +
+                (pickedContainer ? ' &middot; ' + esc(pickedContainer) : '') + (selectedZone ? ' &middot; BLOK ' + esc(selectedZone) : ''));
+        }
+
+        $('#pickContainerInput').on('input', function() {
+            pickedContainer = '';
+            $('#pickResult').html('');
+            updateConfirmState();
+        }).on('keypress', function(e) { if (e.which === 13) $('#btnCheckContainer').click(); });
+
+        $('#btnCheckContainer').on('click', function() {
+            if (!current) return;
+            let no = $('#pickContainerInput').val().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (!no) return;
+            let btn = $(this).prop('disabled', true);
+            $('#pickResult').html('<span class="text-muted">Mengecek ke database depo...</span>');
+            postJson("<?= base_url('yardman/check_container'); ?>", { queue_number: current.queue.queue_number, container_no: no }, function(res) {
+                btn.prop('disabled', false);
+                if (res.status !== 'success') {
+                    feedback(false);
+                    pickedContainer = '';
+                    $('#pickResult').html('<span class="text-danger fw-semibold"><i class="fas fa-circle-xmark me-1"></i>' + esc(res.message).replace(/\n/g, '<br>') + '</span>');
+                } else {
+                    let c = res.container;
+                    pickedContainer = c.container_no;
+                    $('#pickContainerInput').val(c.container_no);
+                    $('#sheetContainer').text(c.container_no);
+                    $('#sheetSize').text(c.size || '-');
+                    $('#pickResult').html('<span class="text-success fw-semibold"><i class="fas fa-circle-check me-1"></i>Cocok: ' + esc(c.principal) + ' &middot; ' + esc(c.size || c.iso_code || '-') + ' &middot; ada di depo</span>');
+                }
+                updateConfirmState();
+            }, function() {
+                btn.prop('disabled', false);
+                $('#pickResult').html('<span class="text-danger">Gagal terhubung ke server.</span>');
+            });
         });
 
         $('#btnSheetCancel').on('click', function() { sheet.hide(); });
@@ -522,7 +606,7 @@
             }
             let btn = $(this).prop('disabled', true);
             let code = current.queue.queue_number;
-            postJson("<?= base_url('yardman/process_scan'); ?>", { queue_number: code, zone_code: selectedZone }, function(res) {
+            postJson("<?= base_url('yardman/process_scan'); ?>", { queue_number: code, zone_code: selectedZone, container_no: pickedContainer }, function(res) {
                 if (res.status !== 'success') {
                     feedback(false);
                     btn.prop('disabled', false);
@@ -531,7 +615,7 @@
                 }
                 lastDone = { code: code, time: Date.now() };
                 showFlash(res.message);
-                addRecentScan(code, current ? current.queue.container_no : '', res.message);
+                addRecentScan(code, pickedContainer || (current ? current.queue.container_no : ''), res.message);
                 loadPending();
                 sheet.hide();
             }, function() {
@@ -566,7 +650,7 @@
             $('#recentCount').text(recentCount + ' scan');
             let now = new Date();
             let time = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
-            let done = /SURVEY SELESAI/.test(msg);
+            let done = /SURVEY SELESAI|MUAT CONTAINER SELESAI/.test(msg);
             $('#recentScanList').prepend(
                 '<div class="recent-item"><div>' +
                     '<div class="fw-bold">' + esc(container || code) + '</div>' +
@@ -583,7 +667,7 @@
             }
             $(listId).html(rows.map(function(r) {
                 return '<div class="pending-item"><div>' +
-                    '<div class="fw-bold">' + esc(r.container_no || r.queue_number) + '</div>' +
+                    '<div class="fw-bold">' + esc(r.container_no || r.queue_number) + ' <span class="act-tag act-' + esc(r.activity) + '">' + esc(r.activity_label) + '</span></div>' +
                     '<small class="text-muted">' + esc(r.license_plate) + ' &middot; #' + esc(r.queue_number) + '</small></div>' +
                     '<span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span></div>';
             }).join(''));
@@ -592,12 +676,16 @@
         function loadPending() {
             $.ajax({ url: "<?= base_url('yardman/pending_json'); ?>", data: { _: Date.now() }, dataType: "json" })
                 .done(function(res) {
-                    let waiting = res.waiting_survey || [], survey = res.in_survey || [];
-                    $('#countWaiting').text(waiting.length);
+                    let all = res.waiting_survey || [], survey = res.in_survey || [];
+                    let isMuat = function(r) { return r.activity === 'D' || r.activity === 'E'; };
+                    let waiting = all.filter(function(r) { return !isMuat(r); });
+                    let muat = all.filter(isMuat);
+                    $('#countWaiting').text(all.length);
                     $('#countSurvey').text(survey.length);
-                    $('#chipWaiting').toggleClass('late', waiting.some(function(r) { return r.overdue; }));
+                    $('#chipWaiting').toggleClass('late', all.some(function(r) { return r.overdue; }));
                     $('#chipSurvey').toggleClass('late', survey.some(function(r) { return r.overdue; }));
                     renderPendingList(waiting, '#pendingWaitingList');
+                    renderPendingList(muat, '#pendingMuatList');
                     renderPendingList(survey, '#pendingSurveyList');
                 })
                 .fail(function(xhr) { if (xhr.status === 401) window.location.reload(); });

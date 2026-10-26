@@ -94,7 +94,7 @@
             <?php foreach ($summary['stages'] as $stage): ?>
                 <div class="col-md-6 col-xl">
                     <div class="card-kpi<?= $stage['percent'] !== NULL && $stage['percent'] < 80 ? ' border-start border-4 border-danger' : ''; ?>">
-                        <small class="text-muted d-block mb-1"><?= html_escape($stage['label']); ?> <span class="opacity-75">(&le; <?= $stage['target']; ?> mnt)</span></small>
+                        <small class="text-muted d-block mb-1"><?= html_escape($stage['label']); ?><?php if ($stage['target'] !== NULL): ?> <span class="opacity-75">(&le; <?= $stage['target']; ?> mnt)</span><?php endif; ?></small>
                         <h3 class="fw-bold mb-0 <?= $stage['percent'] === NULL ? 'text-muted' : ($stage['percent'] >= 80 ? 'text-success' : 'text-danger'); ?>">
                             <?= $stage['percent'] === NULL ? '-' : $stage['percent'] . '%'; ?>
                             <small class="fs-6 text-muted">capai target</small>
@@ -120,6 +120,7 @@
                         <tr>
                             <th>Gate Out</th>
                             <th>No. Antrean</th>
+                            <th>Aktivitas</th>
                             <th>Nopol</th>
                             <th>Container</th>
                             <th>Principal</th>
@@ -129,6 +130,7 @@
                             <th>Antre</th>
                             <th>Gate In</th>
                             <th>Survey</th>
+                            <th>Muat</th>
                             <th>Gate Out</th>
                             <th>Total</th>
                             <th>Petugas</th>
@@ -136,12 +138,13 @@
                     </thead>
                     <tbody>
                         <?php if (empty($rows)): ?>
-                            <tr><td colspan="14" class="text-center text-muted py-4">Tidak ada truk yang selesai pada rentang tanggal ini.</td></tr>
+                            <tr><td colspan="16" class="text-center text-muted py-4">Tidak ada truk yang selesai pada rentang tanggal ini.</td></tr>
                         <?php endif; ?>
                         <?php foreach ($rows as $r): ?>
                             <tr>
                                 <td><?= $time_only($r['gate_out_at']); ?></td>
                                 <td class="fw-bold"><?= html_escape($r['queue_number']); ?></td>
+                                <td><span class="act-tag act-<?= html_escape($r['activity']); ?>"><?= html_escape($r['activity_label']); ?></span></td>
                                 <td class="fw-semibold"><?= html_escape($r['license_plate']); ?></td>
                                 <td><?= html_escape($r['container_no'] ? $r['container_no'] : '-'); ?></td>
                                 <td><?= html_escape($r['principal'] ? $r['principal'] : '-'); ?></td>
@@ -151,8 +154,9 @@
                                 <td class="text-muted"><?= $r['wait_minutes'] === NULL ? '-' : $r['wait_minutes']; ?></td>
                                 <td><?= $stage_cell($r['stage_gate_in'], $target); ?></td>
                                 <td><?= $stage_cell($r['stage_survey'], $target); ?></td>
+                                <td><?= $stage_cell($r['stage_muat'], $r['muat_target']); ?></td>
                                 <td><?= $stage_cell($r['stage_gate_out'], $target); ?></td>
-                                <td><?= $stage_cell($r['total_minutes'], $target * 3); ?></td>
+                                <td><?= $stage_cell($r['total_minutes'], $r['total_target']); ?></td>
                                 <td>
                                     <small class="text-muted" title="Gate In / Yardman / Gate Out">
                                         <?= html_escape(($r['gate_in_name'] ? $r['gate_in_name'] : '-') . ' / ' . ($r['yard_scan_name'] ? $r['yard_scan_name'] : '-') . ' / ' . ($r['gate_out_name'] ? $r['gate_out_name'] : '-')); ?>

@@ -79,7 +79,16 @@
             'AT_YARD'      => 'Menuju Gate Out',
             'COMPLETED'    => 'Selesai'
         );
-        $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'AT_YARD' => 2);
+        // Export / Repo Out: tanpa survey, Yardman langsung memuat container
+        $is_muat = in_array($queue->activity, array('D', 'E'), TRUE);
+        if ($is_muat) {
+            $status_labels['IN_YARD'] = 'Menuju Yardman (Muat)';
+            $step_names = array('Gate In', 'Muat', 'Gate Out');
+            $step_index = array('IN_YARD' => 1, 'AT_YARD' => 2);
+        } else {
+            $step_names = array('Gate In', 'Survey', 'Gate Out');
+            $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'AT_YARD' => 2);
+        }
         $current_step = isset($step_index[$queue->status]) ? $step_index[$queue->status] : -1;
     ?>
     <div class="app">
@@ -131,11 +140,11 @@
             <div class="location-box <?= empty($queue->zone_code) ? 'pending' : ''; ?> lx-rise">
                 <span class="ico"><i class="fas <?= empty($queue->zone_code) ? 'fa-map-location-dot' : 'fa-location-dot'; ?>"></i></span>
                 <div>
-                    <div class="small" style="opacity: .8;">Lokasi Penempatan Container</div>
+                    <div class="small" style="opacity: .8;"><?= $is_muat ? 'Lokasi Pengambilan Container' : 'Lokasi Penempatan Container'; ?></div>
                     <?php if (!empty($queue->zone_code)): ?>
                         <div class="h4 fw-bold mb-0"><?= html_escape($queue->depo); ?> &middot; Blok <?= html_escape($queue->zone_code); ?></div>
                     <?php else: ?>
-                        <div class="fw-semibold">Ditentukan Yardman setelah survey selesai</div>
+                        <div class="fw-semibold"><?= $is_muat ? 'Ditentukan Yardman saat muat container' : 'Ditentukan Yardman setelah survey selesai'; ?></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -145,7 +154,7 @@
             <div class="card-app text-center lx-rise" id="timerCard">
                 <?php if ($timer !== NULL): ?>
                     <div class="stepper">
-                        <?php foreach (array('Gate In', 'Survey', 'Gate Out') as $i => $step_name): ?>
+                        <?php foreach ($step_names as $i => $step_name): ?>
                             <div class="step <?= $i < $current_step ? 'done' : ($i === $current_step ? 'active' : ''); ?>">
                                 <div class="dot"><?= $i < $current_step ? '<i class="fas fa-check"></i>' : $i + 1; ?></div><?= $step_name; ?>
                             </div>
@@ -296,7 +305,7 @@
         }
 
         let currentStatus = "<?= $queue->status; ?>";
-        const STAGE_SECONDS = <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?> * 60;
+        let STAGE_SECONDS = <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?> * 60;
         let stageEnd = null;
         let totalEnd = null;
 
@@ -313,6 +322,7 @@
             stageEnd = Date.now() + timer.stage_remaining_seconds * 1000;
             totalEnd = Date.now() + timer.total_remaining_seconds * 1000;
             $('#stageLabel').text(timer.stage_label);
+            STAGE_SECONDS = timer.stage_target_minutes * 60;
             tick();
         }
 
@@ -327,7 +337,7 @@
             let ratio = Math.max(0, Math.min(1, stageLeft / (STAGE_SECONDS)));
             $('#stageBar').attr('stroke-dashoffset', (552.92 * (1 - (stageLeft < 0 ? 1 : ratio))).toFixed(1));
             $('#totalBox').toggleClass('late', totalLeft < 0);
-            $('#timerStatusText').text(stageLeft < 0 ? 'Tahap ini melewati target KPI ' + <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?> + ' menit' : 'Timer KPI berjalan sejak Gate In');
+            $('#timerStatusText').text(stageLeft < 0 ? 'Tahap ini melewati target KPI ' + Math.round(STAGE_SECONDS / 60) + ' menit' : 'Timer KPI berjalan sejak Gate In');
         }
         setInterval(tick, 1000);
         setTimers(<?= json_encode($timer, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
@@ -357,12 +367,18 @@
         }
 
         // POP UP setiap tahap selesai
-        const STAGE_POPUPS = {
+        const STAGE_POPUPS = <?= $is_muat ? 'MUAT_POPUPS' : 'SURVEY_POPUPS'; ?>();
+        function MUAT_POPUPS() { return {
+            IN_YARD:   { title: 'Gate In Berhasil!', text: 'Kitir <?= $queue->activity === 'D' ? 'Export' : 'Repo Out'; ?> sudah tercatat masuk depo.', next: 'Selanjutnya: menuju YARDMAN untuk muat container.' },
+            AT_YARD:   { title: 'Container Sudah Dimuat!', text: <?= json_encode(trim(($queue->container_no ? 'Container ' . $queue->container_no . '. ' : '') . (!empty($queue->zone_code) ? 'Diambil di ' . $queue->depo . ' - Blok ' . $queue->zone_code . '.' : '')), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, next: 'Selanjutnya: menuju GATE OUT dan serahkan kitir ke petugas.' },
+            COMPLETED: { title: 'Gate Out Berhasil!', text: 'Seluruh proses di depo sudah selesai. Terima kasih.', next: 'Hati-hati di jalan.' }
+        }; }
+        function SURVEY_POPUPS() { return {
             IN_YARD:   { title: 'Gate In Berhasil!', text: 'Container <?= html_escape($queue->container_no); ?> sudah tercatat masuk depo.', next: 'Selanjutnya: menuju AREA SURVEY dan tunjukkan barcode ke Yardman.' },
             IN_SURVEY: { title: 'Masuk Area Survey', text: 'Container sedang disurvey oleh Yardman.', next: 'Selanjutnya: tunggu survey selesai, Yardman akan scan barcode Anda lagi.' },
             AT_YARD:   { title: 'Survey Selesai!', text: <?= json_encode(!empty($queue->zone_code) ? 'Lokasi penempatan: ' . $queue->depo . ' - Blok ' . $queue->zone_code . '.' : 'Survey container sudah selesai.', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, next: 'Selanjutnya: menuju GATE OUT dan tunjukkan barcode ke petugas.' },
             COMPLETED: { title: 'Gate Out Berhasil!', text: 'Seluruh proses di depo sudah selesai. Terima kasih.', next: 'Hati-hati di jalan.' }
-        };
+        }; }
 
         function notifyDevice() {
             try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}

@@ -136,13 +136,13 @@
         </div>
 
         <!-- KPI per Tahap hari ini: proses mana yang tidak mencapai target -->
-        <div class="section-label">KPI per tahap hari ini <small>(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, truk yang sudah Gate Out)</small></div>
+        <div class="section-label">KPI per tahap hari ini <small>(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, pilih container Export <?= MY_Controller::EXPORT_PICK_KPI_MINUTES; ?> menit, truk yang sudah Gate Out)</small></div>
         <div class="row g-3 mb-4" id="stageKpiCards"></div>
 
         <!-- Pending per Tahap: klik untuk menyaring tabel Live Antrean -->
         <div class="section-label">Pending per tahap <small>(klik untuk melihat detail)</small></div>
         <div class="row g-3 mb-4" id="stageCards">
-            <div class="col-md-6 col-xl-3">
+            <div class="col-md-6 col-xl">
                 <div class="stage-card" data-stage="antre" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -154,7 +154,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 col-xl-3">
+            <div class="col-md-6 col-xl">
                 <div class="stage-card" data-stage="gate_in" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -166,7 +166,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 col-xl-3">
+            <div class="col-md-6 col-xl">
                 <div class="stage-card" data-stage="survey" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -178,13 +178,25 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 col-xl-3">
+            <div class="col-md-6 col-xl">
+                <div class="stage-card" data-stage="muat" role="button" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-1">Tahap Muat (Export / Repo Out)</small>
+                            <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
+                            <small class="stage-overdue text-muted">Gate In &rarr; container dimuat</small>
+                        </div>
+                        <div class="icon-kpi-wrapper" style="background-color: #e0ecff; color: #1d4ed8;"><i class="fas fa-dolly fa-lg"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl">
                 <div class="stage-card" data-stage="gate_out" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
                             <small class="text-muted d-block mb-1">Tahap Gate Out</small>
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
-                            <small class="stage-overdue text-muted">Selesai survey &rarr; Gate Out</small>
+                            <small class="stage-overdue text-muted">Survey / muat &rarr; Gate Out</small>
                         </div>
                         <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #059669;"><i class="fas fa-sign-out-alt fa-lg"></i></div>
                     </div>
@@ -354,13 +366,16 @@
         }
 
         const STAGE_KPI = <?= MY_Controller::STAGE_KPI_MINUTES; ?>;
-        const STAGE_TITLES = { antre: 'Antre Gate In', gate_in: 'Tahap Gate In', survey: 'Tahap Survey', gate_out: 'Tahap Gate Out' };
+        const EXPORT_KPI = <?= MY_Controller::EXPORT_PICK_KPI_MINUTES; ?>;
+        const STAGE_TITLES = { antre: 'Antre Gate In', gate_in: 'Tahap Gate In', survey: 'Tahap Survey', muat: 'Tahap Muat', gate_out: 'Tahap Gate Out' };
+        // Tahap pilih container (Export) & muat (Repo Out) digabung di kartu "Tahap Muat"
+        function cardStage(q) { return (q.stage === 'pick' || q.stage === 'load') ? 'muat' : q.stage; }
         let activeStage = null;
         let lastQueues = [];
 
         function renderStageCards(queues) {
             $.each(STAGE_TITLES, function(stage) {
-                let rows = queues.filter(function(q) { return q.stage === stage; });
+                let rows = queues.filter(function(q) { return cardStage(q) === stage; });
                 let late = rows.filter(function(q) { return q.stage_overdue; }).length;
                 let card = $('.stage-card[data-stage="' + stage + '"]');
                 card.find('.stage-count').text(rows.length);
@@ -368,7 +383,7 @@
                 if (stage !== 'antre') {
                     card.find('.stage-overdue')
                         .toggleClass('stage-late', late > 0)
-                        .text(late > 0 ? late + ' truk lewat ' + STAGE_KPI + ' menit!' : 'Semua dalam target \u2264 ' + STAGE_KPI + ' menit');
+                        .text(late > 0 ? late + ' truk lewat target!' : (stage === 'muat' ? 'Dalam target (Export \u2264 ' + EXPORT_KPI + ', Repo Out \u2264 ' + STAGE_KPI + ' mnt)' : 'Semua dalam target \u2264 ' + STAGE_KPI + ' menit'));
                 }
             });
         }
@@ -377,7 +392,7 @@
             lastQueues = queues;
             renderStageCards(queues);
 
-            let rows = activeStage ? queues.filter(function(q) { return q.stage === activeStage; }) : queues;
+            let rows = activeStage ? queues.filter(function(q) { return cardStage(q) === activeStage; }) : queues;
             if (activeStage) {
                 // Detail pending: yang paling lama menunggu di tahap ini ditaruh paling atas
                 rows = rows.slice().sort(function(a, b) { return b.stage_minutes - a.stage_minutes; });
@@ -386,11 +401,11 @@
             let html = '';
             rows.forEach(function(q) {
                 html += '<tr>' +
-                    '<td class="fw-bold">' + esc(q.queue_number) + '</td>' +
+                    '<td class="fw-bold">' + esc(q.queue_number) + '<br><span class="act-tag act-' + esc(q.activity) + '">' + esc(q.activity_label) + '</span></td>' +
                     '<td class="fw-semibold">' + esc(q.license_plate) + '</td>' +
                     '<td>' + esc(q.container_no || '-') + '</td>' +
                     '<td><span class="badge badge-pill-status ' + esc(q.badge_class) + '">' + esc(q.status_label) + '</span></td>' +
-                    '<td><span class="badge ' + (q.stage_overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(q.stage_minutes) + ' mnt</span></td>' +
+                    '<td><span class="badge ' + (q.stage_overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(q.stage_minutes) + (q.stage_target ? ' / ' + esc(q.stage_target) : '') + ' mnt</span></td>' +
                     '<td>' + esc(q.elapsed_minutes) + ' Menit</td>' +
                     '<td>' + (q.estimated_call === null ? '-' : esc(q.estimated_call) + ' Menit') + '</td>' +
                 '</tr>';
@@ -446,8 +461,8 @@
                 let has = k.total > 0;
                 let good = has && k.percent >= 80;
                 let color = !has ? 'text-muted' : (good ? 'text-success' : 'text-danger');
-                html += '<div class="col-md-4"><div class="card-kpi' + (has && !good ? ' border-start border-4 border-danger' : '') + '">' +
-                    '<small class="text-muted d-block mb-1">' + esc(k.label) + '</small>' +
+                html += '<div class="col-md-6 col-xl"><div class="card-kpi' + (has && !good ? ' border-start border-4 border-danger' : '') + '">' +
+                    '<small class="text-muted d-block mb-1">' + esc(k.label) + ' <span class="opacity-75">(\u2264 ' + esc(k.target) + ' mnt)</span></small>' +
                     '<h3 class="fw-bold mb-0 ' + color + '">' + (has ? esc(k.percent) + '%' : '-') + ' <small class="fs-6 text-muted">capai target</small></h3>' +
                     '<small class="text-muted">' + (has ? 'Rata-rata ' + esc(k.avg_minutes) + ' mnt &middot; ' + esc(k.achieved) + '/' + esc(k.total) + ' truk' : 'Belum ada truk selesai hari ini') + '</small>' +
                 '</div></div>';

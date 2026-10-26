@@ -116,8 +116,8 @@
 
                     <div class="mb-4">
                         <span class="scan-icon"><i class="fas fa-barcode"></i></span>
-                        <h4 class="fw-bold text-dark mb-1"><?= $role == 'GATE_OUT' ? 'Arahkan Scanner ke Barcode di HP Supir' : 'Arahkan Scanner ke Barcode Kitir'; ?></h4>
-                        <p class="text-muted small mb-0"><?= $role == 'GATE_OUT' ? 'Barcode supir muncul setelah Gate In dan berisi data container' : 'Gate In: scan barcode kitir (contoh Z02155544), lalu pilih truk dan konfirmasi'; ?></p>
+                        <h4 class="fw-bold text-dark mb-1"><?= $role == 'GATE_OUT' ? 'Scan Barcode Kitir / QR di HP Supir' : 'Arahkan Scanner ke Barcode Kitir'; ?></h4>
+                        <p class="text-muted small mb-0"><?= $role == 'GATE_OUT' ? 'Export & Repo Out: scan barcode kitir. Repo In & Import: scan kitir atau QR supir' : 'Kitir Z = Repo In, A = Import, D = Export, E = Repo Out. Scan, pilih truk, lalu konfirmasi'; ?></p>
                     </div>
 
                     <!-- Input Box -->
@@ -133,7 +133,8 @@
                             <button type="button" class="btn btn-sm btn-outline-secondary" id="kitirCancel">Batal</button>
                         </div>
                         <table class="table table-sm small mb-3">
-                            <tr><td class="text-muted" style="width: 35%;">No. Container</td><td class="fw-bold" id="kitirContainer"></td></tr>
+                            <tr><td class="text-muted" style="width: 35%;">Aktivitas</td><td id="kitirActivity"></td></tr>
+                            <tr><td class="text-muted">No. Container</td><td class="fw-bold" id="kitirContainer"></td></tr>
                             <tr><td class="text-muted">Principal</td><td class="fw-semibold" id="kitirPrincipal"></td></tr>
                             <tr><td class="text-muted">Size</td><td class="fw-semibold" id="kitirSize"></td></tr>
                             <tr><td class="text-muted">Customer</td><td class="fw-semibold" id="kitirCustomer"></td></tr>
@@ -273,7 +274,7 @@
             let html = '';
             rows.forEach(function(r) {
                 html += '<tr data-queue="' + esc(r.queue_number) + '" style="cursor: pointer;">' +
-                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + '</td>' +
+                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + (showZone ? ' <span class="act-tag act-' + esc(r.activity) + '">' + esc(r.activity_label) + '</span>' : '') + '</td>' +
                     '<td>' + esc(r.license_plate) + '</td>' +
                     (showZone ? '<td>' + esc(r.zone_code || '-') + '</td>' : '') +
                     '<td><span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span></td>' +
@@ -318,8 +319,8 @@
                     return;
                 }
                 if (code !== '') {
-                    // Barcode kitir (Z + angka) = proses Gate In, selain itu QR supir (Gate Out)
-                    if (IS_GATE_IN && /^Z\d{6,12}$/.test(code)) {
+                    // Barcode kitir (Z/A/D/E + angka) di Gate In = proses Gate In, selain itu Gate Out (kitir / QR supir)
+                    if (IS_GATE_IN && /^[ZADE]\d{6,12}$/.test(code)) {
                         lookupKitir(code);
                     } else {
                         sendGateScan(code);
@@ -395,7 +396,12 @@
                 }
                 currentKitir = res.kitir;
                 $('#kitirBarcode').text('(' + res.kitir.barcode + ')');
-                $('#kitirContainer').text(res.kitir.container_no);
+                $('#kitirActivity').html('<span class="act-tag act-' + esc(res.kitir.activity) + '">' + esc(res.kitir.activity_label) + '</span>');
+                if (res.kitir.container_no) {
+                    $('#kitirContainer').text(res.kitir.container_no);
+                } else {
+                    $('#kitirContainer').html('<span class="text-muted fw-normal">Dipilih Yardman saat muat</span>');
+                }
                 $('#kitirPrincipal').text(res.kitir.principal || '-');
                 $('#kitirSize').text(res.kitir.size || '-');
                 $('#kitirCustomer').text(res.kitir.customer || '-');

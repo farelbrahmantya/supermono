@@ -46,7 +46,7 @@ class Gate extends MY_Controller {
 
         $candidates = $this->_pending_queues('WAITING_GATE');
         if (empty($candidates)) {
-            $this->_json(array('status' => 'warning', 'message' => "Kitir {$kitir->container_no} ditemukan, tetapi tidak ada truk yang sedang antre Gate In."));
+            $this->_json(array('status' => 'warning', 'message' => "Kitir {$kitir->barcode} ditemukan, tetapi tidak ada truk yang sedang antre Gate In."));
             return;
         }
 
@@ -59,6 +59,9 @@ class Gate extends MY_Controller {
                 break;
             }
         }
+
+        $kitir->activity_label = $this->_activity_label($kitir->activity);
+        $kitir->muat           = $this->_is_muat($kitir->activity);
 
         $this->_json(array(
             'status'     => 'success',
@@ -100,28 +103,47 @@ class Gate extends MY_Controller {
             'status'         => 'IN_YARD',
             'gate_in_at'     => $this->_now(),
             'gate_in_by'     => $this->session->userdata('user_id'),
-            'cp_id'          => $kitir->cp_id,
-            'container_no'   => $kitir->container_no,
-            'principal'      => $kitir->principal,
-            'container_size' => $kitir->size,
-            'customer'       => $kitir->customer
+            'cp_id'              => $kitir->cp_id,
+            'activity'           => $kitir->activity,
+            'container_no'       => $kitir->container_no !== '' ? $kitir->container_no : NULL,
+            'principal'          => $kitir->principal,
+            'container_size'     => $kitir->size,
+            'customer'           => $kitir->customer,
+            'sla_target_minutes' => $this->_total_target($kitir->activity)
         ));
 
+        $label = $this->_activity_label($kitir->activity);
+        if ($kitir->activity === 'D') {
+            $text = "Kitir Export {$kitir->barcode} ({$kitir->principal}).\nSilakan menuju Yardman untuk pemilihan container.";
+        } elseif ($kitir->activity === 'E') {
+            $text = "{$label} - Container {$kitir->container_no}.\nSilakan menuju Yardman untuk muat container.";
+        } else {
+            $text = "{$label} - Container {$kitir->container_no}.\nSilakan menuju area survey.";
+        }
         $this->_json($updated
-            ? array('status' => 'success', 'message' => "GATE IN SUCCESS!\nTruk {$queue->license_plate} - Container {$kitir->container_no}.\nSilakan menuju area survey.")
+            ? array('status' => 'success', 'message' => "GATE IN SUCCESS!\nTruk {$queue->license_plate} - {$text}")
             : array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
     }
 
-    // Scan QR supir (Gate Out). Gate In wajib lewat barcode kitir.
+    // Gate Out: scan barcode kitir atau QR supir. Gate In wajib lewat barcode kitir.
     public function process_scan() {
-        $queue_number = $this->_extract_queue_number($this->input->post('queue_number'));
-        $user_role    = $this->session->userdata('role');
+        $input     = $this->input->post('queue_number');
+        $user_role = $this->session->userdata('role');
 
-        $queue = $this->db->get_where('queue_transactions', array('queue_number' => $queue_number))->row();
-
-        if (!$queue) {
-            $this->_json(array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue_number . ' tidak ditemukan!'));
-            return;
+        $this->load->model('kitir_model');
+        if ($this->kitir_model->parse_barcode($input) !== FALSE) {
+            $queue = $this->_queue_by_kitir($input);
+            if (!is_object($queue)) {
+                $this->_json($queue);
+                return;
+            }
+        } else {
+            $queue_number = $this->_extract_queue_number($input);
+            $queue = $this->db->get_where('queue_transactions', array('queue_number' => $queue_number))->row();
+            if (!$queue) {
+                $this->_json(array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue_number . ' tidak ditemukan!'));
+                return;
+            }
         }
 
         $can_gate_out = in_array($user_role, array('GATE_OUT', 'CONTROL_TOWER'), TRUE);
@@ -142,7 +164,7 @@ class Gate extends MY_Controller {
                 'gate_out_by' => $this->session->userdata('user_id')
             ));
             $this->_json($updated
-                ? array('status' => 'success', 'message' => "GATE OUT SUCCESS!\nTruk {$queue->license_plate} Servis Selesai.")
+                ? array('status' => 'success', 'message' => "GATE OUT SUCCESS!\nTruk {$queue->license_plate}" . ($queue->container_no ? " - Container {$queue->container_no}" : '') . ".\n" . $this->_activity_label($queue->activity) . ' selesai.')
                 : array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
             return;
         }
@@ -150,7 +172,9 @@ class Gate extends MY_Controller {
         if ($can_gate_out && in_array($queue->status, array('IN_YARD', 'IN_SURVEY'), TRUE)) {
             $this->_json(array(
                 'status'  => 'warning',
-                'message' => "Truk {$queue->license_plate} BELUM selesai survey Yardman.\nArahkan truk ke Yardman sebelum Gate Out."
+                'message' => $this->_is_muat($queue->activity)
+                    ? "Truk {$queue->license_plate} BELUM muat container.\nArahkan truk ke Yardman sebelum Gate Out."
+                    : "Truk {$queue->license_plate} BELUM selesai survey Yardman.\nArahkan truk ke Yardman sebelum Gate Out."
             ));
             return;
         }
@@ -170,7 +194,7 @@ class Gate extends MY_Controller {
         $this->load->model('kitir_model');
 
         if ($this->kitir_model->parse_barcode($barcode) === FALSE) {
-            return array('status' => 'error', 'message' => 'Barcode ' . strtoupper(trim((string) $barcode)) . ' bukan barcode kitir (contoh: Z02155544).');
+            return array('status' => 'error', 'message' => 'Barcode ' . strtoupper(trim((string) $barcode)) . ' bukan barcode kitir (contoh: Z02155544, A02155830, D1578461, E1577775).');
         }
 
         $kitir = $this->kitir_model->find_by_barcode($barcode);
@@ -182,9 +206,25 @@ class Gate extends MY_Controller {
                          ->where_not_in('status', array('COMPLETED', 'CANCELLED'))
                          ->get('queue_transactions')->row();
         if ($used) {
-            return array('status' => 'warning', 'message' => "Kitir {$kitir->container_no} sudah dipakai antrean #{$used->queue_number} ({$used->license_plate}).");
+            return array('status' => 'warning', 'message' => "Kitir {$kitir->barcode} sudah dipakai antrean #{$used->queue_number} ({$used->license_plate}).");
         }
 
         return $kitir;
+    }
+
+    // Antrean aktif yang memakai kitir ini (untuk Gate Out scan kitir), atau array respon error
+    private function _queue_by_kitir($barcode) {
+        $kitir = $this->kitir_model->find_by_barcode($barcode);
+        if (!$kitir) {
+            return array('status' => 'error', 'message' => 'Data kitir ' . strtoupper(trim((string) $barcode)) . ' tidak ditemukan di database depo.');
+        }
+        $queue = $this->db->where('cp_id', $kitir->cp_id)
+                          ->where_in('status', $this->in_depo_statuses)
+                          ->order_by('id', 'DESC')
+                          ->get('queue_transactions', 1)->row();
+        if (!$queue) {
+            return array('status' => 'warning', 'message' => "Kitir {$kitir->barcode} tidak sedang dipakai truk di dalam depo.");
+        }
+        return $queue;
     }
 }

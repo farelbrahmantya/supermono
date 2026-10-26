@@ -54,17 +54,17 @@ class Control_tower extends MY_Controller {
         $out = fopen('php://output', 'w');
         fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
         fputcsv($out, array(
-            'No. Antrean', 'Nopol', 'No. HP Supir', 'No. Container', 'Principal', 'Size', 'Customer', 'Depo', 'Blok',
+            'No. Antrean', 'Aktivitas', 'Nopol', 'No. HP Supir', 'No. Container', 'Principal', 'Size', 'Customer', 'Depo', 'Blok',
             'Daftar', 'Gate In', 'Masuk Survey', 'Selesai Survey', 'Gate Out',
-            'Antre (mnt)', 'Tahap Gate In (mnt)', 'Tahap Survey (mnt)', 'Tahap Gate Out (mnt)', 'Total Proses (mnt)', 'Capai KPI Semua Tahap',
+            'Antre (mnt)', 'Tahap Gate In (mnt)', 'Tahap Survey (mnt)', 'Tahap Muat Container (mnt)', 'Tahap Gate Out (mnt)', 'Total Proses (mnt)', 'Capai KPI Semua Tahap',
             'Petugas Gate In', 'Yardman Survey', 'Yardman Selesai', 'Petugas Gate Out'
         ), ';');
         foreach ($rows as $r) {
             fputcsv($out, array(
-                $r['queue_number'], $r['license_plate'], $r['driver_phone'], $r['container_no'], $r['principal'], $r['container_size'], $r['customer'], $r['depo'], $r['zone_code'],
+                $r['queue_number'], $r['activity_label'], $r['license_plate'], $r['driver_phone'], $r['container_no'], $r['principal'], $r['container_size'], $r['customer'], $r['depo'], $r['zone_code'],
                 $r['created_at'], $r['gate_in_at'], $r['survey_start_at'], $r['yard_scan_at'], $r['gate_out_at'],
                 $this->_csv_number($r['wait_minutes']), $this->_csv_number($r['stage_gate_in']), $this->_csv_number($r['stage_survey']),
-                $this->_csv_number($r['stage_gate_out']), $this->_csv_number($r['total_minutes']), $r['all_achieved'] ? 'YA' : 'TIDAK',
+                $this->_csv_number($r['stage_muat']), $this->_csv_number($r['stage_gate_out']), $this->_csv_number($r['total_minutes']), $r['all_achieved'] ? 'YA' : 'TIDAK',
                 $r['gate_in_name'], $r['survey_start_name'], $r['yard_scan_name'], $r['gate_out_name']
             ), ';');
         }
@@ -104,16 +104,32 @@ class Control_tower extends MY_Controller {
         ", array($date_from . ' 00:00:00', $date_to . ' 23:59:59'))->result_array();
 
         foreach ($rows as &$r) {
+            $plan = $this->_stage_plan($r['activity']);
+
+            $r['activity_label'] = $this->_activity_label($r['activity']);
             $r['wait_minutes']   = $this->_minutes_between($r['created_at'], $r['gate_in_at']);
-            $r['stage_gate_in']  = $this->_minutes_between($r['gate_in_at'], $r['survey_start_at']);
-            $r['stage_survey']   = $this->_minutes_between($r['survey_start_at'], $r['yard_scan_at']);
-            $r['stage_gate_out'] = $this->_minutes_between($r['yard_scan_at'], $r['gate_out_at']);
             $r['total_minutes']  = $this->_minutes_between($r['gate_in_at'], $r['gate_out_at']);
+            $r['total_target']   = $this->_total_target($r['activity']);
+            $r['stage_gate_in']  = $r['stage_survey'] = $r['stage_muat'] = $r['stage_gate_out'] = NULL;
+            $r['muat_target']    = NULL;
+            // Durasi per tahap: kunci tahap => menit
+            $r['stages']         = array();
 
             $r['all_achieved'] = TRUE;
-            foreach (array('stage_gate_in', 'stage_survey', 'stage_gate_out') as $stage) {
-                if ($r[$stage] === NULL || $r[$stage] > self::STAGE_KPI_MINUTES) {
+            foreach ($plan as $key => $stage) {
+                $minutes = $this->_minutes_between($r[$stage[2]], $r[$stage[3]]);
+                $r['stages'][$key] = $minutes;
+                if ($minutes === NULL || $minutes > $stage[4]) {
                     $r['all_achieved'] = FALSE;
+                }
+            }
+            $r['stage_gate_in']  = isset($r['stages']['gate_in']) ? $r['stages']['gate_in'] : NULL;
+            $r['stage_survey']   = isset($r['stages']['survey']) ? $r['stages']['survey'] : NULL;
+            $r['stage_gate_out'] = $r['stages']['gate_out'];
+            foreach (array('pick', 'load') as $key) {
+                if (array_key_exists($key, $plan)) {
+                    $r['stage_muat']  = $r['stages'][$key];
+                    $r['muat_target'] = $plan[$key][4];
                 }
             }
         }
@@ -121,26 +137,45 @@ class Control_tower extends MY_Controller {
         return $rows;
     }
 
+    // Semua tahap KPI dari seluruh aktivitas: kunci => [nama, target menit]
+    private function _all_stages() {
+        $all = array();
+        foreach (array('Z', 'D', 'E') as $activity) {
+            foreach ($this->_stage_plan($activity) as $key => $stage) {
+                $all[$key] = array($stage[0] . ($key === 'pick' ? ' (Export)' : ($key === 'load' ? ' (Repo Out)' : '')), $stage[4]);
+            }
+        }
+        // Urutan tampil: tahap Gate Out paling akhir
+        $gate_out = $all['gate_out'];
+        unset($all['gate_out']);
+        $all['gate_out'] = $gate_out;
+        return $all;
+    }
+
     // Ringkasan riwayat: jumlah truk, rata-rata & persentase capai target per tahap
     private function _history_summary($rows) {
         $summary = array('total' => count($rows), 'all_achieved' => 0, 'stages' => array());
-        $stages  = array('stage_gate_in' => 'Gate In', 'stage_survey' => 'At Yard (Survey)', 'stage_gate_out' => 'Gate Out', 'total_minutes' => 'Total Proses');
+        $stages  = $this->_all_stages();
+        $stages['total'] = array('Total Proses', NULL);
 
-        foreach ($stages as $key => $label) {
-            $values = array();
+        foreach ($stages as $key => $stage) {
+            $values   = array();
+            $achieved = 0;
             foreach ($rows as $r) {
-                if ($r[$key] !== NULL) {
-                    $values[] = $r[$key];
+                $value  = $key === 'total' ? $r['total_minutes'] : (isset($r['stages'][$key]) ? $r['stages'][$key] : NULL);
+                $target = $key === 'total' ? $r['total_target'] : $stage[1];
+                if ($value !== NULL) {
+                    $values[] = $value;
+                    if ($value <= $target) $achieved++;
                 }
             }
-            $target   = $key === 'total_minutes' ? self::STAGE_KPI_MINUTES * 3 : self::STAGE_KPI_MINUTES;
-            $achieved = 0;
-            foreach ($values as $v) {
-                if ($v <= $target) $achieved++;
+            // Tahap muat hanya ditampilkan jika ada truk aktivitas tersebut
+            if (in_array($key, array('pick', 'load'), TRUE) && empty($values)) {
+                continue;
             }
             $summary['stages'][] = array(
-                'label'    => $label,
-                'target'   => $target,
+                'label'    => $stage[0],
+                'target'   => $key === 'total' ? NULL : $stage[1],
                 'count'    => count($values),
                 'avg'      => count($values) ? round(array_sum($values) / count($values), 1) : NULL,
                 'percent'  => count($values) ? (int) round($achieved / count($values) * 100) : NULL
@@ -226,7 +261,7 @@ class Control_tower extends MY_Controller {
     private function _get_active_queues() {
         $now  = $this->_now();
         $rows = $this->db->query("
-            SELECT q.id, q.queue_number, q.license_plate, q.container_no, q.status, q.sla_target_minutes, z.zone_code, z.depo,
+            SELECT q.id, q.queue_number, q.license_plate, q.container_no, q.status, q.activity, q.sla_target_minutes, z.zone_code, z.depo,
             CASE WHEN q.status = 'WAITING_GATE'
                  THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
                  ELSE TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
@@ -261,6 +296,12 @@ class Control_tower extends MY_Controller {
                 if ($rate !== NULL) {
                     $estimated_call = (int) round(($position - 1) * $rate);
                 }
+            } elseif ($q->status === 'IN_YARD' && $q->activity === 'D') {
+                $label = 'Gate In - Pilih Container (Yardman)';
+                $badge = 'badge-yard';
+            } elseif ($q->status === 'IN_YARD' && $q->activity === 'E') {
+                $label = 'Gate In - Menuju Muat (Yardman)';
+                $badge = 'badge-yard';
             } elseif ($q->status === 'IN_YARD') {
                 $label = 'Gate In - Menuju Survey';
                 $badge = 'badge-yard';
@@ -268,7 +309,7 @@ class Control_tower extends MY_Controller {
                 $label = 'Sedang Survey';
                 $badge = 'badge-yard';
             } else {
-                $label = 'Menunggu Gate Out' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
+                $label = ($this->_is_muat($q->activity) ? 'Sudah Muat - ' : '') . 'Menunggu Gate Out' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
                 $badge = 'badge-yard';
             }
 
@@ -277,8 +318,11 @@ class Control_tower extends MY_Controller {
                 $badge = 'badge-over-sla';
             }
 
+            $stage = $this->_current_stage($q);
             $queues[] = array(
                 'queue_number'    => $q->queue_number,
+                'activity'        => $q->activity,
+                'activity_label'  => $this->_activity_label($q->activity),
                 'license_plate'   => $q->license_plate,
                 'container_no'    => $q->container_no,
                 'status_label'    => $label,
@@ -286,9 +330,10 @@ class Control_tower extends MY_Controller {
                 'elapsed_minutes' => $elapsed,
                 'estimated_call'  => $estimated_call,
                 // Tahap yang sedang ditunggu & lama menunggu di tahap itu (KPI per tahap di dalam depo)
-                'stage'           => isset($this->stages[$q->status]) ? $this->stages[$q->status][0] : 'antre',
+                'stage'           => $stage ? $stage[0] : 'antre',
+                'stage_target'    => $stage ? $stage[3] : NULL,
                 'stage_minutes'   => $stage_minutes,
-                'stage_overdue'   => $q->status !== 'WAITING_GATE' && $stage_minutes > self::STAGE_KPI_MINUTES
+                'stage_overdue'   => $stage !== NULL && $stage_minutes > $stage[3]
             );
         }
 
@@ -297,30 +342,43 @@ class Control_tower extends MY_Controller {
 
     // KPI per tahap untuk truk yang Gate Out hari ini: rata-rata menit & jumlah yang mencapai target
     private function _get_stage_kpi() {
-        $target = self::STAGE_KPI_MINUTES * 60;
-        $row = $this->db->query("
-            SELECT COUNT(*) AS total,
-                   AVG(TIMESTAMPDIFF(SECOND, gate_in_at, survey_start_at))   AS avg_gate_in,
-                   AVG(TIMESTAMPDIFF(SECOND, survey_start_at, yard_scan_at)) AS avg_survey,
-                   AVG(TIMESTAMPDIFF(SECOND, yard_scan_at, gate_out_at))     AS avg_gate_out,
-                   SUM(TIMESTAMPDIFF(SECOND, gate_in_at, survey_start_at) <= ?)   AS ok_gate_in,
-                   SUM(TIMESTAMPDIFF(SECOND, survey_start_at, yard_scan_at) <= ?) AS ok_survey,
-                   SUM(TIMESTAMPDIFF(SECOND, yard_scan_at, gate_out_at) <= ?)     AS ok_gate_out
+        $rows = $this->db->query("
+            SELECT activity, gate_in_at, survey_start_at, yard_scan_at, gate_out_at
             FROM queue_transactions
-            WHERE status = 'COMPLETED' AND gate_out_at >= ? AND survey_start_at IS NOT NULL
-        ", array($target, $target, $target, date('Y-m-d 00:00:00')))->row();
+            WHERE status = 'COMPLETED' AND gate_out_at >= ?
+        ", array(date('Y-m-d 00:00:00')))->result_array();
 
-        $total  = (int) $row->total;
+        $stats = array();
+        foreach ($rows as $r) {
+            foreach ($this->_stage_plan($r['activity']) as $key => $stage) {
+                $minutes = $this->_minutes_between($r[$stage[2]], $r[$stage[3]]);
+                if ($minutes === NULL) {
+                    continue;
+                }
+                if (!isset($stats[$key])) {
+                    $stats[$key] = array('sum' => 0, 'ok' => 0, 'total' => 0);
+                }
+                $stats[$key]['sum'] += $minutes;
+                $stats[$key]['total']++;
+                if ($minutes <= $stage[4]) $stats[$key]['ok']++;
+            }
+        }
+
         $result = array();
-        foreach (array('gate_in' => 'Gate In', 'survey' => 'At Yard (Survey)', 'gate_out' => 'Gate Out') as $key => $label) {
-            $ok = (int) $row->{'ok_' . $key};
+        foreach ($this->_all_stages() as $key => $stage) {
+            $s = isset($stats[$key]) ? $stats[$key] : array('sum' => 0, 'ok' => 0, 'total' => 0);
+            // Tahap muat (Export / Repo Out) hanya tampil jika hari ini ada truknya
+            if (in_array($key, array('pick', 'load'), TRUE) && $s['total'] === 0) {
+                continue;
+            }
             $result[] = array(
                 'stage'       => $key,
-                'label'       => $label,
-                'avg_minutes' => $total ? round((float) $row->{'avg_' . $key} / 60, 1) : NULL,
-                'achieved'    => $ok,
-                'total'       => $total,
-                'percent'     => $total ? (int) round($ok / $total * 100) : NULL
+                'label'       => $stage[0],
+                'target'      => $stage[1],
+                'avg_minutes' => $s['total'] ? round($s['sum'] / $s['total'], 1) : NULL,
+                'achieved'    => $s['ok'],
+                'total'       => $s['total'],
+                'percent'     => $s['total'] ? (int) round($s['ok'] / $s['total'] * 100) : NULL
             );
         }
         return $result;
