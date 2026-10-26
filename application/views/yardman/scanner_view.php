@@ -29,7 +29,7 @@
         .stat-chip small { color: #94a3b8; font-size: 11px; }
         .stat-chip.late { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
 
-        .cam { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 20px; overflow: hidden; background: #000; }
+        .cam { --ar: 3 / 4; position: relative; width: 100%; max-width: 100%; aspect-ratio: var(--ar); margin: 0 auto; border-radius: 20px; overflow: hidden; background: #000; }
         #reader { position: absolute; inset: 0; border: none !important; }
         #reader > div { display: none !important; } /* label "Scanner paused" bawaan library */
         #reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
@@ -79,7 +79,11 @@
         .depo-tabs button.active { background: #fff; color: #0f172a; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
         .block-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
         .block-grid button { border: 2px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 12px 0; font-weight: 800; color: #334155; }
+        .block-grid button { position: relative; border-left-width: 6px; }
         .block-grid button.active { border-color: var(--green); background: #ecfdf5; color: #047857; }
+        .block-grid button.dim { opacity: .45; }
+        .block-grid button .tag { display: block; font-size: 9px; font-weight: 700; color: #6b6f78; letter-spacing: .02em; }
+        .principal-note { font-size: 12px; border-radius: 10px; padding: 8px 10px; }
         .btn-confirm { padding: 14px; border-radius: 14px; font-weight: 800; font-size: 16px; }
 
         /* Kilat hasil sukses */
@@ -132,6 +136,8 @@
                 </div>
             </div>
 
+            <div class="small text-center mt-2" style="color: #a9adb6;"><i class="fas fa-circle-info me-1"></i> Jarak ideal 20&ndash;30 cm dari layar HP supir</div>
+
             <!-- Input manual -->
             <div class="manual">
                 <input type="text" id="manualQueueInput" class="form-control" placeholder="Ketik no. antrean, contoh A-20261025-001" autocomplete="off">
@@ -176,7 +182,8 @@
                 <div id="zonePicker" style="display:none;">
                     <div class="fw-bold small text-secondary mb-2">PILIH DEPO &amp; BLOK PENEMPATAN</div>
                     <div class="depo-tabs mb-2" id="depoTabs"></div>
-                    <div class="block-grid mb-3" id="blockGrid"></div>
+                    <div class="block-grid mb-2" id="blockGrid"></div>
+                    <div class="principal-note alert alert-warning mb-3" id="principalNote" style="display:none;"></div>
                 </div>
             </div>
 
@@ -210,7 +217,7 @@
         // Blok penempatan dikelompokkan per depo
         const ZONES = {};
         <?php foreach ($zones as $zone): ?>
-        (ZONES[<?= json_encode($zone->depo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>] = ZONES[<?= json_encode($zone->depo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>] || []).push(<?= json_encode($zone->zone_code, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);
+        (ZONES[<?= json_encode($zone->depo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>] = ZONES[<?= json_encode($zone->depo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>] || []).push(<?= json_encode(array('code' => $zone->zone_code, 'principal' => isset($zone->principal) ? $zone->principal : NULL, 'color' => isset($zone->principal_color) ? $zone->principal_color : NULL), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);
         <?php endforeach; ?>
 
         function esc(value) {
@@ -285,13 +292,18 @@
             if (!scanner) {
                 scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
             }
-            let source = cameraIndex >= 0 && cameras[cameraIndex] ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: 'environment' };
+            let useDevice = cameraIndex >= 0 && cameras[cameraIndex];
+            let source = useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: 'environment' };
+            // Tanpa paksa rasio 1:1 (iPhone bisa menolak / memotong gambar), minta resolusi tinggi agar QR kecil tetap terbaca
+            let constraints = $.extend({}, useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: { ideal: 'environment' } },
+                { width: { ideal: 1920 }, height: { ideal: 1080 } });
 
             $('#cam').removeClass('off');
             camStatus('Menyalakan kamera...');
-            scanner.start(source, { fps: 12, aspectRatio: 1.0 }, onDecoded, function() {})
+            scanner.start(source, { fps: 12, videoConstraints: constraints }, onDecoded, function() {})
                 .then(function() {
                     camStatus('Arahkan kamera ke QR di HP supir');
+                    fitCameraBox();
                     setupCameraTools();
                 })
                 .catch(function(err) {
@@ -312,7 +324,44 @@
             Html5Qrcode.getCameras().then(function(list) {
                 cameras = list || [];
                 $('#btnSwitch').toggle(cameras.length > 1);
+                // Pertama kali: pindah ke kamera belakang terbaik (iPhone Pro: "Back Triple/Dual Wide Camera"
+                // bisa beralih ke lensa makro, sehingga QR dari jarak dekat tetap fokus)
+                if (cameraIndex === -1) {
+                    cameraIndex = preferredBackCamera(cameras);
+                    let running = '';
+                    try { running = scanner.getRunningTrackSettings().deviceId || ''; } catch (e) {}
+                    if (cameraIndex >= 0 && cameras[cameraIndex].id !== running) {
+                        scanner.stop().then(startCamera).catch(startCamera);
+                    }
+                }
             }).catch(function() { $('#btnSwitch').hide(); });
+        }
+
+        function preferredBackCamera(list) {
+            let order = [/triple/i, /dual wide/i, /dual/i, /(back|rear|belakang|environment)/i];
+            for (let i = 0; i < order.length; i++) {
+                for (let j = 0; j < list.length; j++) {
+                    if (order[i].test(list[j].label) && !/(front|depan|user|ultra|tele)/i.test(list[j].label)) return j;
+                }
+            }
+            return -1;
+        }
+
+        // Kotak kamera mengikuti rasio video asli agar gambar tidak terpotong
+        function fitCameraBox() {
+            let video = document.querySelector('#reader video');
+            if (!video) return;
+            let apply = function() {
+                if (video.videoWidth && video.videoHeight) {
+                    // Lebar dibatasi agar tinggi kotak maksimal 62% layar
+                    let ratio = video.videoWidth / video.videoHeight;
+                    let width = Math.min($('#cam').parent().width(), window.innerHeight * 0.62 * ratio);
+                    $('#cam').css({ '--ar': video.videoWidth + ' / ' + video.videoHeight, width: Math.round(width) + 'px' });
+                }
+            };
+            apply();
+            video.addEventListener('loadedmetadata', apply);
+            video.addEventListener('resize', apply);
         }
 
         $('#btnStartCam').on('click', startCamera);
@@ -406,6 +455,7 @@
                 $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> MULAI SURVEY').removeClass('btn-dark btn-success').addClass('btn-primary').prop('disabled', false).data('action', 'confirm');
             } else {
                 $('#stepPill').attr('class', 'step-pill step-2').html('<i class="fas fa-flag-checkered"></i> LANGKAH 2 &middot; SURVEY SELESAI');
+                $('#principalNote').hide();
                 renderZonePicker();
                 $('#zonePicker').toggle(Object.keys(ZONES).length > 0);
                 $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> SELESAI SURVEY').removeClass('btn-dark btn-primary').addClass('btn-success')
@@ -413,14 +463,35 @@
             }
         }
 
+        // Cocokkan principal kitir dengan principal blok (contoh: "CMA" ~ "CMA CGM", "WHL" ~ "WAN HAI")
+        const PRINCIPAL_ALIAS = { WHL: 'WANHAI', WANHAILINES: 'WANHAI', KMTCLINES: 'KMTC', CMA: 'CMACGM' };
+        function normPrincipal(name) {
+            let n = String(name || '').toUpperCase().replace(/[^A-Z]/g, '');
+            return PRINCIPAL_ALIAS[n] || n;
+        }
+        function principalMatch(zone) {
+            let want = normPrincipal(current && current.queue ? current.queue.principal : '');
+            return !want || !zone.principal || normPrincipal(zone.principal) === want;
+        }
+        function findZone(code) {
+            let found = null;
+            $.each(ZONES, function(depo, list) { list.forEach(function(z) { if (z.code === code) found = z; }); });
+            return found;
+        }
+
         function renderZonePicker(activeDepo) {
             let depos = Object.keys(ZONES);
-            activeDepo = activeDepo || depos[0];
+            if (!activeDepo) {
+                // Buka depo yang punya blok sesuai principal container
+                activeDepo = depos.filter(function(d) { return ZONES[d].some(principalMatch); })[0] || depos[0];
+            }
             $('#depoTabs').html(depos.map(function(d) {
                 return '<button type="button" data-depo="' + esc(d) + '" class="' + (d === activeDepo ? 'active' : '') + '">' + esc(d) + '</button>';
             }).join(''));
             $('#blockGrid').html((ZONES[activeDepo] || []).map(function(z) {
-                return '<button type="button" data-zone="' + esc(z) + '" class="' + (z === selectedZone ? 'active' : '') + '">' + esc(z) + '</button>';
+                let cls = (z.code === selectedZone ? 'active ' : '') + (principalMatch(z) ? '' : 'dim');
+                return '<button type="button" data-zone="' + esc(z.code) + '" class="' + cls + '" style="border-left-color: ' + esc(z.color || '#e2e8f0') + ';">' +
+                    esc(z.code) + '<span class="tag">' + esc(z.principal || '') + '</span></button>';
             }).join(''));
         }
 
@@ -429,6 +500,11 @@
             selectedZone = $(this).data('zone');
             $('#blockGrid button').removeClass('active');
             $(this).addClass('active');
+            let zone = findZone(selectedZone);
+            let mismatch = zone && !principalMatch(zone);
+            $('#principalNote').toggle(!!mismatch).html(mismatch
+                ? '<i class="fas fa-triangle-exclamation me-1"></i> Blok ' + esc(zone.code) + ' untuk principal <b>' + esc(zone.principal) + '</b>, container ini <b>' + esc(current.queue.principal) + '</b>. Pastikan penempatan benar.'
+                : '');
             $('#btnSheetConfirm').prop('disabled', false).html('<i class="fas fa-check me-1"></i> SELESAI SURVEY &middot; BLOK ' + esc(selectedZone));
         });
 

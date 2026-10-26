@@ -5,6 +5,10 @@ class Control_tower extends MY_Controller {
 
     protected $allowed_roles = array('CONTROL_TOWER');
 
+    // Batas traffic truk di jalan akses satu blok: >= MEDIUM = sedang, >= HIGH = padat
+    const TRAFFIC_MEDIUM = 3;
+    const TRAFFIC_HIGH = 5;
+
     public function __construct() {
         parent::__construct();
         $this->load->database();
@@ -341,26 +345,31 @@ class Control_tower extends MY_Controller {
     }
 
     private function _get_yard_density() {
-        // Jumlah truk yang sedang dilayani (AT_YARD) per blok dibanding kapasitas blok
+        // Traffic trucking di jalan akses tiap blok: truk yang sudah diarahkan ke blok (survey selesai)
+        // dan belum Gate Out. Bukan isi tumpukan container di blok.
         $rows = $this->db->query("
-            SELECT z.zone_code, z.depo, z.capacity, COUNT(q.id) AS total
+            SELECT z.zone_code, z.depo, z.principal, z.principal_color, COUNT(q.id) AS total
             FROM yard_zones z
             LEFT JOIN queue_transactions q ON q.current_zone_id = z.id AND q.status = 'AT_YARD'
-            GROUP BY z.id, z.zone_code, z.depo, z.capacity
+            GROUP BY z.id, z.zone_code, z.depo, z.principal, z.principal_color
             ORDER BY z.depo ASC, z.zone_code ASC
         ")->result();
 
         $grid = array();
         foreach ($rows as $row) {
-            $count    = (int) $row->total;
-            $capacity = max(1, (int) $row->capacity);
-            $percent  = $count / $capacity * 100;
+            $count = (int) $row->total;
 
             $level = 'low';
-            if ($percent >= 80) $level = 'high';
-            elseif ($percent >= 50) $level = 'medium';
+            if ($count >= self::TRAFFIC_HIGH) $level = 'high';
+            elseif ($count >= self::TRAFFIC_MEDIUM) $level = 'medium';
 
-            $grid[$row->zone_code] = array('depo' => $row->depo, 'count' => $count, 'capacity' => (int) $row->capacity, 'level' => $level);
+            $grid[$row->zone_code] = array(
+                'depo'            => $row->depo,
+                'principal'       => $row->principal,
+                'principal_color' => $row->principal_color,
+                'count'           => $count,
+                'level'           => $level
+            );
         }
         return $grid;
     }

@@ -1,7 +1,7 @@
 -- =====================================================================
 -- LASMONO - Struktur database lengkap (instalasi baru / laptop demo)
 -- Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5.
--- Untuk database yang sudah berjalan, gunakan upgrade_lasmono_db.sql lalu upgrade_02_kitir_timer.sql.
+-- Untuk database yang sudah berjalan, gunakan upgrade_lasmono_db.sql, upgrade_02_kitir_timer.sql, lalu upgrade_03_principal_blok.sql.
 -- Login petugas: yardman1 / admin_ct / gate_in / gate_out, password: password123
 -- =====================================================================
 
@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS `yard_zones` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `zone_code` varchar(10) NOT NULL,
   `depo` varchar(20) NOT NULL DEFAULT 'Depo 1',
+  `principal` varchar(30) DEFAULT NULL,
+  `principal_color` varchar(7) DEFAULT NULL,
   `zone_name` varchar(100) NOT NULL,
   `capacity` int(11) NOT NULL DEFAULT '20',
   `created_at` datetime DEFAULT NULL,
@@ -84,34 +86,34 @@ INSERT INTO `users` (`id`, `name`, `username`, `password`, `role`, `created_at`)
 (3, 'Security Gate In', 'gate_in', '$2a$10$xMMGFJunUxU7qpo9Lkq52OZtIHMu/2FqaoUBSRXkSiDgfzUs9GxBG', 'GATE_IN', NOW()),
 (4, 'Security Gate Out', 'gate_out', '$2a$10$/LdGNFVlBfGiLWxZhrwqFemdja41nZ8ONzI.ct8QkYmOF1HXK2MP2', 'GATE_OUT', NOW());
 
-INSERT INTO `yard_zones` (`zone_code`, `depo`, `zone_name`, `capacity`, `created_at`) VALUES
-('A1', 'Depo 1', 'Blok A1', 20, NOW()),
-('A2', 'Depo 1', 'Blok A2', 20, NOW()),
-('A3', 'Depo 1', 'Blok A3', 20, NOW()),
-('A4', 'Depo 1', 'Blok A4', 20, NOW()),
-('A5', 'Depo 1', 'Blok A5', 20, NOW()),
-('B1', 'Depo 1', 'Blok B1', 20, NOW()),
-('B2', 'Depo 1', 'Blok B2', 20, NOW()),
-('B3', 'Depo 1', 'Blok B3', 20, NOW()),
-('B4', 'Depo 1', 'Blok B4', 20, NOW()),
-('B5', 'Depo 1', 'Blok B5', 20, NOW()),
-('C1', 'Depo 1', 'Blok C1', 20, NOW()),
-('C2', 'Depo 1', 'Blok C2', 20, NOW()),
-('C3', 'Depo 1', 'Blok C3', 20, NOW()),
-('C4', 'Depo 1', 'Blok C4', 20, NOW()),
-('C5', 'Depo 1', 'Blok C5', 20, NOW()),
-('D1', 'Depo 2', 'Blok D1', 20, NOW()),
-('D2', 'Depo 2', 'Blok D2', 20, NOW()),
-('D3', 'Depo 2', 'Blok D3', 20, NOW()),
-('D4', 'Depo 2', 'Blok D4', 20, NOW()),
-('D5', 'Depo 2', 'Blok D5', 20, NOW()),
-('E1', 'Depo 2', 'Blok E1', 20, NOW()),
-('E2', 'Depo 2', 'Blok E2', 20, NOW()),
-('E3', 'Depo 2', 'Blok E3', 20, NOW()),
-('E4', 'Depo 2', 'Blok E4', 20, NOW()),
-('E5', 'Depo 2', 'Blok E5', 20, NOW()),
-('F1', 'Depo 2', 'Blok F1', 20, NOW()),
-('F2', 'Depo 2', 'Blok F2', 20, NOW()),
-('F3', 'Depo 2', 'Blok F3', 20, NOW()),
-('F4', 'Depo 2', 'Blok F4', 20, NOW()),
-('F5', 'Depo 2', 'Blok F5', 20, NOW());
+INSERT INTO `yard_zones` (`zone_code`, `depo`, `principal`, `principal_color`, `zone_name`, `capacity`, `created_at`) VALUES
+('A1', 'Depo 1', 'ONE', '#e4007f', 'Blok A1', 20, NOW()),
+('A2', 'Depo 1', 'ONE', '#e4007f', 'Blok A2', 20, NOW()),
+('A3', 'Depo 1', 'ONE', '#e4007f', 'Blok A3', 20, NOW()),
+('A4', 'Depo 1', 'WAN HAI', '#0b3d91', 'Blok A4', 20, NOW()),
+('A5', 'Depo 1', 'WAN HAI', '#0b3d91', 'Blok A5', 20, NOW()),
+('B1', 'Depo 1', 'ONE', '#e4007f', 'Blok B1', 20, NOW()),
+('B2', 'Depo 1', 'ONE', '#e4007f', 'Blok B2', 20, NOW()),
+('B3', 'Depo 1', 'ONE', '#e4007f', 'Blok B3', 20, NOW()),
+('B4', 'Depo 1', 'WAN HAI', '#0b3d91', 'Blok B4', 20, NOW()),
+('B5', 'Depo 1', 'WAN HAI', '#0b3d91', 'Blok B5', 20, NOW()),
+('C1', 'Depo 1', 'ONE', '#e4007f', 'Blok C1', 20, NOW()),
+('C2', 'Depo 1', 'ONE', '#e4007f', 'Blok C2', 20, NOW()),
+('C3', 'Depo 1', 'ONE', '#e4007f', 'Blok C3', 20, NOW()),
+('C4', 'Depo 1', 'WAN HAI', '#0b3d91', 'Blok C4', 20, NOW()),
+('C5', 'Depo 1', 'WAN HAI', '#0b3d91', 'Blok C5', 20, NOW()),
+('D1', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok D1', 20, NOW()),
+('D2', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok D2', 20, NOW()),
+('D3', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok D3', 20, NOW()),
+('D4', 'Depo 2', 'CMA CGM', '#041e42', 'Blok D4', 20, NOW()),
+('D5', 'Depo 2', 'CMA CGM', '#041e42', 'Blok D5', 20, NOW()),
+('E1', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok E1', 20, NOW()),
+('E2', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok E2', 20, NOW()),
+('E3', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok E3', 20, NOW()),
+('E4', 'Depo 2', 'CMA CGM', '#041e42', 'Blok E4', 20, NOW()),
+('E5', 'Depo 2', 'CMA CGM', '#041e42', 'Blok E5', 20, NOW()),
+('F1', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok F1', 20, NOW()),
+('F2', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok F2', 20, NOW()),
+('F3', 'Depo 2', 'KMTC', '#1f3f8f', 'Blok F3', 20, NOW()),
+('F4', 'Depo 2', 'CMA CGM', '#041e42', 'Blok F4', 20, NOW()),
+('F5', 'Depo 2', 'CMA CGM', '#041e42', 'Blok F5', 20, NOW());
