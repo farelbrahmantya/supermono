@@ -86,7 +86,8 @@ class Company_user_model extends CI_Model {
             'md5'            => array("({$hex} = MD5(?) OR u.password = UNHEX(MD5(?)))", array($password, $password)),
             'sha1'           => array("({$hex} = SHA1(?) OR u.password = UNHEX(SHA1(?)))", array($password, $password)),
             'mysql_password' => array("CONVERT(u.password USING latin1) = PASSWORD(?)", array($password)),
-            'aes'            => array("AES_DECRYPT(u.password, ?) = ?", array($key, $password)),
+            // Sama seperti LoginUser() di aplikasi utama: password = AES_ENCRYPT(password, $HashKey)
+            'aes'            => array("u.password = AES_ENCRYPT(?, ?)", array($password, $key)),
             'encode'         => array("DECODE(u.password, ?) = ?", array($key, $password))
         );
 

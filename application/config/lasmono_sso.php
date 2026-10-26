@@ -9,13 +9,13 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 // Aktif/nonaktifkan login dengan user perusahaan (akun lokal LASMONO tetap bisa dipakai)
 $config['sso_enabled'] = TRUE;
 
-// Cara aplikasi utama menyimpan tbluser.password:
-//   'auto'     : coba md5, sha1, PASSWORD() MySQL, bcrypt (dan aes/encode jika kunci diisi)
-//   'md5' | 'sha1' | 'mysql_password' | 'bcrypt'
-//   'aes'      : AES_ENCRYPT(password, kunci)  -> isi sso_password_key
-//   'encode'   : ENCODE(password, kunci)       -> isi sso_password_key
-// Setelah cara yang dipakai diketahui, ganti 'auto' dengan cara tersebut.
-$config['sso_password_mode'] = getenv('LASMONO_SSO_PASSWORD_MODE') ?: 'auto';
+// Cara aplikasi utama (COINS, class/class_login.php LoginUser) menyimpan tbluser.password:
+//   password = AES_ENCRYPT(password, $HashKey)  -> mode 'aes'
+// Mode lain yang didukung: 'auto', 'md5', 'sha1', 'mysql_password', 'bcrypt', 'encode'.
+$config['sso_password_mode'] = getenv('LASMONO_SSO_PASSWORD_MODE') ?: 'aes';
+
+// Nilai $HashKey dari aplikasi utama (lihat config.php COINS). RAHASIA: isi langsung di server,
+// atau lewat environment LASMONO_SSO_PASSWORD_KEY. Jangan di-commit ke GitHub.
 $config['sso_password_key']  = getenv('LASMONO_SSO_PASSWORD_KEY') ?: '';
 
 // Cabang yang boleh masuk (tblstaff.ktrasl), 003 = Surabaya
