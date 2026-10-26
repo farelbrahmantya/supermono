@@ -31,8 +31,8 @@
         .yard-art { display: block; width: 100%; max-width: 460px; height: auto; margin-bottom: 26px; }
         .yard-art .truck { animation: lx-drive 9s ease-in-out infinite; }
         .yard-art .hook { animation: lx-hook 4.5s ease-in-out infinite; transform-box: fill-box; }
-        @keyframes lx-drive { 0%, 12% { transform: translateX(0); } 50%, 62% { transform: translateX(-46px); } 100% { transform: translateX(0); } }
-        @keyframes lx-hook { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+        @keyframes lx-drive { 0%, 15% { transform: translateX(0); } 50%, 65% { transform: translateX(-22px); } 100% { transform: translateX(0); } }
+        @keyframes lx-hook { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(14px); } }
         @media (prefers-reduced-motion: reduce) { .yard-art .truck, .yard-art .hook { animation: none; } }
 
         /* Pilihan kegiatan supir: wajib dipilih, tanpa pilihan bawaan */
@@ -89,51 +89,62 @@
             </div>
 
             <div class="my-4 my-lg-0">
-                <svg class="yard-art d-none d-lg-block" viewBox="0 0 460 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ilustrasi container yard">
+                <svg class="yard-art d-none d-lg-block" viewBox="0 0 460 170" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ilustrasi container yard">
                     <defs>
-                        <pattern id="ribs" width="6" height="10" patternUnits="userSpaceOnUse"><rect width="6" height="10" fill="none"/><line x1="3" y1="0" x2="3" y2="10" stroke="#000" stroke-opacity=".16" stroke-width="1.4"/></pattern>
+                        <radialGradient id="yaSun" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#f6c64a" stop-opacity=".55"/><stop offset="1" stop-color="#f6c64a" stop-opacity="0"/></radialGradient>
+                        <linearGradient id="yaGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6c64a"/><stop offset="1" stop-color="#d9951a"/></linearGradient>
+                        <linearGradient id="yaAmber" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c98a1c"/><stop offset="1" stop-color="#a86f12"/></linearGradient>
+                        <linearGradient id="yaRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5484d"/><stop offset="1" stop-color="#b8242a"/></linearGradient>
+                        <linearGradient id="yaCream" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf7ee"/><stop offset="1" stop-color="#e6dfcf"/></linearGradient>
+                        <linearGradient id="yaFade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".2" stop-color="#fff" stop-opacity=".35"/><stop offset=".8" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+                        <pattern id="yaRibs" width="5" height="10" patternUnits="userSpaceOnUse"><line x1="2.5" y1="0" x2="2.5" y2="10" stroke="#000" stroke-opacity=".13" stroke-width="1"/></pattern>
                     </defs>
-                    <!-- Tanah yard -->
-                    <rect x="0" y="128" width="460" height="2" rx="1" fill="#ffffff" opacity=".18"/>
-                    <path d="M0 140 Q12 134 24 140 T48 140 T72 140 T96 140 T120 140 T144 140 T168 140 T192 140 T216 140 T240 140 T264 140 T288 140 T312 140 T336 140 T360 140 T384 140 T408 140 T432 140 T456 140" fill="none" stroke="#f6c64a" stroke-opacity=".35" stroke-width="2"/>
 
-                    <!-- Tumpukan container kiri -->
+                    <!-- Cahaya senja di belakang crane -->
+                    <circle cx="300" cy="70" r="70" fill="url(#yaSun)"/>
+                    <circle cx="300" cy="70" r="22" fill="#f6c64a" opacity=".22"/>
+
+                    <!-- Siluet tumpukan jauh -->
+                    <path d="M20 132 V108 H64 V96 H118 V108 H150 V132 Z M330 132 V100 H382 V112 H440 V132 Z" fill="#ffffff" opacity=".05"/>
+
+                    <!-- Tumpukan container utama -->
                     <g>
-                        <rect x="8" y="104" width="78" height="24" rx="2" fill="#d72a2f"/><rect x="8" y="104" width="78" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="8" y="80" width="78" height="24" rx="2" fill="#e5a720"/><rect x="8" y="80" width="78" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="8" y="56" width="78" height="24" rx="2" fill="#f4f1ea"/><rect x="8" y="56" width="78" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="90" y="104" width="78" height="24" rx="2" fill="#3a3d45"/><rect x="90" y="104" width="78" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="90" y="80" width="78" height="24" rx="2" fill="#d72a2f"/><rect x="90" y="80" width="78" height="24" rx="2" fill="url(#ribs)"/>
+                        <rect x="40" y="110" width="64" height="22" rx="2.5" fill="url(#yaAmber)"/><rect x="40" y="110" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
+                        <rect x="40" y="88" width="64" height="22" rx="2.5" fill="url(#yaCream)"/><rect x="40" y="88" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
+                        <rect x="108" y="110" width="64" height="22" rx="2.5" fill="url(#yaGold)"/><rect x="108" y="110" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
+                        <rect x="108" y="88" width="64" height="22" rx="2.5" fill="url(#yaRed)"/><rect x="108" y="88" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
+                        <rect x="108" y="66" width="64" height="22" rx="2.5" fill="url(#yaGold)"/><rect x="108" y="66" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
+                        <rect x="252" y="110" width="64" height="22" rx="2.5" fill="url(#yaCream)"/><rect x="252" y="110" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
+                        <rect x="252" y="88" width="64" height="22" rx="2.5" fill="url(#yaAmber)"/><rect x="252" y="88" width="64" height="22" rx="2.5" fill="url(#yaRibs)"/>
                     </g>
 
-                    <!-- Crane RTG emas di atas tumpukan tengah -->
-                    <g>
-                        <rect x="184" y="104" width="78" height="24" rx="2" fill="#e5a720"/><rect x="184" y="104" width="78" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="184" y="80" width="78" height="24" rx="2" fill="#f4f1ea"/><rect x="184" y="80" width="78" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="176" y="18" width="7" height="110" fill="#f6c64a"/>
-                        <rect x="265" y="18" width="7" height="110" fill="#f6c64a"/>
-                        <rect x="170" y="12" width="108" height="10" rx="2" fill="#f6c64a"/>
-                        <rect x="210" y="22" width="26" height="9" rx="2" fill="#ffffff" opacity=".9"/>
-                        <g class="hook">
-                            <line x1="216" y1="31" x2="216" y2="50" stroke="#ffffff" stroke-opacity=".7" stroke-width="1.5"/>
-                            <line x1="230" y1="31" x2="230" y2="50" stroke="#ffffff" stroke-opacity=".7" stroke-width="1.5"/>
-                            <rect x="196" y="50" width="54" height="5" rx="1.5" fill="#ffffff" opacity=".85"/>
-                            <rect x="194" y="55" width="58" height="20" rx="2" fill="#d72a2f"/><rect x="194" y="55" width="58" height="20" rx="2" fill="url(#ribs)"/>
-                        </g>
-                        <rect x="172" y="124" width="15" height="6" rx="3" fill="#24262c"/><rect x="261" y="124" width="15" height="6" rx="3" fill="#24262c"/>
+                    <!-- Crane RTG garis tipis -->
+                    <g fill="none" stroke="#fbf7ee" stroke-opacity=".85" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M190 132 V40 M334 132 V40 M184 40 H340"/>
+                        <path d="M190 58 L208 40 M334 58 L316 40" stroke-opacity=".45" stroke-width="1.6"/>
+                    </g>
+                    <g class="hook">
+                        <rect x="246" y="36" width="20" height="9" rx="2" fill="#fbf7ee"/>
+                        <path d="M251 45 V64 M261 45 V64" stroke="#fbf7ee" stroke-opacity=".6" stroke-width="1.2"/>
+                        <rect x="222" y="64" width="68" height="4" rx="1.5" fill="#fbf7ee" opacity=".9"/>
+                        <rect x="224" y="68" width="64" height="20" rx="2.5" fill="url(#yaRed)"/><rect x="224" y="68" width="64" height="20" rx="2.5" fill="url(#yaRibs)"/>
                     </g>
 
-                    <!-- Truk trailer membawa container -->
+                    <!-- Truk kecil -->
                     <g class="truck">
-                        <rect x="318" y="92" width="88" height="24" rx="2" fill="#f4f1ea"/><rect x="318" y="92" width="88" height="24" rx="2" fill="url(#ribs)"/>
-                        <rect x="314" y="116" width="96" height="5" rx="1.5" fill="#6b6f78"/>
-                        <path d="M412 98 h22 l12 12 v11 h-34 z" fill="#d72a2f"/>
-                        <rect x="418" y="102" width="14" height="8" rx="1.5" fill="#ffffff" opacity=".85"/>
-                        <circle cx="330" cy="124" r="6" fill="#1c1d21" stroke="#a9adb6" stroke-width="2"/>
-                        <circle cx="346" cy="124" r="6" fill="#1c1d21" stroke="#a9adb6" stroke-width="2"/>
-                        <circle cx="398" cy="124" r="6" fill="#1c1d21" stroke="#a9adb6" stroke-width="2"/>
-                        <circle cx="434" cy="124" r="6" fill="#1c1d21" stroke="#a9adb6" stroke-width="2"/>
+                        <rect x="356" y="112" width="56" height="16" rx="2" fill="url(#yaCream)"/><rect x="356" y="112" width="56" height="16" rx="2" fill="url(#yaRibs)"/>
+                        <rect x="353" y="128" width="62" height="3" rx="1.5" fill="#8a8f99"/>
+                        <path d="M416 116 h14 l8 8 v7 h-22 z" fill="url(#yaGold)"/>
+                        <rect x="420" y="119" width="9" height="5" rx="1" fill="#1c1d21" opacity=".55"/>
+                        <circle cx="366" cy="133" r="4" fill="#1c1d21" stroke="#fbf7ee" stroke-opacity=".6" stroke-width="1.5"/>
+                        <circle cx="402" cy="133" r="4" fill="#1c1d21" stroke="#fbf7ee" stroke-opacity=".6" stroke-width="1.5"/>
+                        <circle cx="428" cy="133" r="4" fill="#1c1d21" stroke="#fbf7ee" stroke-opacity=".6" stroke-width="1.5"/>
                     </g>
+
+                    <!-- Dermaga & ombak -->
+                    <rect x="10" y="137" width="440" height="1.5" fill="url(#yaFade)"/>
+                    <path d="M20 152 q10 -6 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0" fill="none" stroke="#f6c64a" stroke-opacity=".4" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M60 163 q10 -5 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0" fill="none" stroke="#f6c64a" stroke-opacity=".18" stroke-width="1.4" stroke-linecap="round"/>
                 </svg>
                 <h1 class="mb-2">Layanan Service <span>Monitoring</span><br>Container Yard</h1>
                 <span class="lx-squiggle mb-3"></span>
