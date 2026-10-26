@@ -12,7 +12,7 @@
         .card-section { background: #fff; border: 1px solid var(--lx-border); border-radius: 22px; padding: 24px; box-shadow: var(--lx-shadow); }
         .table-custom th { background: #f8fafc; color: var(--lx-muted); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid var(--lx-border); white-space: nowrap; padding: 12px 10px; }
         .table-custom td { padding: 12px 10px; font-size: 13px; vertical-align: middle; white-space: nowrap; border-color: #f1f5f9; }
-        .table-custom tbody tr:hover td { background: #fafbff; }
+        .table-custom tbody tr:hover td { background: #fffaf0; }
         .stage-ok { display: inline-block; min-width: 42px; text-align: center; padding: 3px 8px; border-radius: 8px; background: #dcfce7; color: #047857; font-weight: 700; }
         .stage-late { display: inline-block; min-width: 42px; text-align: center; padding: 3px 8px; border-radius: 8px; background: #fee2e2; color: #b91c1c; font-weight: 700; }
         .quick a { border-radius: 50px; }
@@ -38,7 +38,7 @@
     <!-- Top Header -->
     <header class="lx-topbar d-flex justify-content-between align-items-center mb-4">
         <div class="d-flex align-items-center gap-3">
-            <span class="lx-logo"><i class="fas fa-tower-broadcast"></i></span>
+            <?php $this->load->view('partials/logo', array('size' => 44)); ?>
             <div>
                 <div class="lx-brand fs-5">Riwayat Trucking</div>
                 <div class="lx-sub">Control Tower LASMONO &middot; truk yang sudah Gate Out</div>
@@ -48,7 +48,7 @@
             <a href="<?= base_url('control_tower'); ?>" class="btn btn-sm fw-semibold" style="background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.14); padding: 8px 14px;"><i class="fas fa-arrow-left me-1"></i> Dashboard</a>
             <button type="button" onclick="window.print()" class="btn btn-sm fw-semibold d-none d-md-inline-block" style="background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.14); padding: 8px 14px;"><i class="fas fa-print me-1"></i> Cetak</button>
             <span class="lx-user d-none d-md-inline-flex">
-                <i class="fas fa-user-tie" style="color: #a5b4fc;"></i> <?= html_escape($admin_name); ?>
+                <i class="fas fa-user-tie" style="color: #f6c64a;"></i> <?= html_escape($admin_name); ?>
                 <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
             </span>
         </div>

@@ -10,8 +10,8 @@
     <?php $this->load->view('partials/theme'); ?>
     <style>
         /* Tema gelap "ruang kendali" untuk layar monitor Control Tower */
-        :root { --ct-bg: #0b1220; --ct-card: #111a2e; --ct-card-2: #16213a; --ct-line: rgba(148, 163, 184, .12); --ct-text: #e2e8f0; --ct-muted: #8b9bb4; }
-        body { background: var(--ct-bg); color: var(--ct-text); background-image: radial-gradient(circle at 10% -10%, rgba(59, 91, 253, .18), transparent 40%), radial-gradient(circle at 100% 0%, rgba(109, 74, 255, .14), transparent 35%); background-attachment: fixed; }
+        :root { --ct-bg: #1c1d21; --ct-card: #24262c; --ct-card-2: #2a2c33; --ct-line: rgba(148, 163, 184, .12); --ct-text: #e2e8f0; --ct-muted: #8b9bb4; }
+        body { background: var(--ct-bg); color: var(--ct-text); background-image: radial-gradient(circle at 10% -10%, rgba(229, 167, 32, .18), transparent 40%), radial-gradient(circle at 100% 0%, rgba(246, 198, 74, .14), transparent 35%); background-attachment: fixed; }
         .text-muted, .text-secondary { color: var(--ct-muted) !important; }
         .lx-topbar { background: rgba(11, 18, 32, .82); backdrop-filter: blur(12px); border-bottom: 1px solid var(--ct-line); }
         .section-label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ct-muted); margin-bottom: 12px; }
@@ -25,8 +25,8 @@
         .icon-kpi-wrapper { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         .stage-card { padding: 16px 18px; cursor: pointer; transition: all .15s ease; height: 100%; }
-        .stage-card:hover { border-color: rgba(129, 140, 248, .45); transform: translateY(-2px); }
-        .stage-card.active { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(129, 140, 248, .25), 0 10px 30px rgba(0, 0, 0, .25); }
+        .stage-card:hover { border-color: rgba(246, 198, 74, .45); transform: translateY(-2px); }
+        .stage-card.active { border-color: #f6c64a; box-shadow: 0 0 0 3px rgba(246, 198, 74, .25), 0 10px 30px rgba(0, 0, 0, .25); }
         .stage-card.has-overdue { box-shadow: inset 4px 0 0 #ef4444, 0 10px 30px rgba(0, 0, 0, .25); }
         .stage-card h3 { color: #fff; }
         .stage-late { color: #f87171 !important; font-weight: 700; }
@@ -44,7 +44,7 @@
         .table-custom td { padding: 14px 10px; font-size: 14px; color: var(--ct-text); vertical-align: middle; border-color: var(--ct-line); }
         .table-custom tbody tr:hover td { background: rgba(255, 255, 255, .02); }
         .badge-pill-status { border-radius: 50px; padding: 6px 12px; font-weight: 700; font-size: 12px; }
-        .badge-yard { background: rgba(59, 91, 253, .18); color: #a5b4fc; }
+        .badge-yard { background: rgba(229, 167, 32, .18); color: #f6c64a; }
         .badge-waiting { background: rgba(245, 158, 11, .16); color: #fcd34d; }
         .badge-over-sla { background: rgba(239, 68, 68, .9); color: #fff; animation: lx-pulse 1.5s infinite; }
         .badge.bg-light { background: rgba(255, 255, 255, .08) !important; color: var(--ct-text) !important; border-color: var(--ct-line) !important; }
@@ -66,9 +66,9 @@
     <!-- Top Header -->
     <header class="lx-topbar d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div class="d-flex align-items-center gap-3">
-            <span class="lx-logo"><i class="fas fa-tower-broadcast"></i></span>
+            <?php $this->load->view('partials/logo', array('size' => 44)); ?>
             <div>
-                <div class="lx-brand fs-5">Control Tower <span style="color: #a5b4fc;">LASMONO</span></div>
+                <div class="lx-brand fs-5">Control Tower <span style="color: #f6c64a;">LASMONO</span></div>
                 <div class="lx-sub"><span class="live-dot me-1"></span> Live &middot; Depo Petikemas MTKI &middot; <span class="clock" id="ctClock"></span></div>
             </div>
         </div>
@@ -79,7 +79,7 @@
             <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-clock-rotate-left me-1"></i> Riwayat</a>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
             <span class="lx-user">
-                <i class="fas fa-user-tie" style="color: #a5b4fc;"></i> <?= html_escape($admin_name); ?>
+                <i class="fas fa-user-tie" style="color: #f6c64a;"></i> <?= html_escape($admin_name); ?>
                 <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
             </span>
         </div>
@@ -108,7 +108,7 @@
                         <h2 class="fw-bold mb-0" id="kpiWaiting"><?= $kpi['truck_waiting']; ?></h2>
                         <small class="text-muted"><span id="kpiExpired"><?= $kpi['truck_expired']; ?></span> antrean kedaluwarsa</small>
                     </div>
-                    <div class="icon-kpi-wrapper" style="background-color: rgba(59, 91, 253, .18); color: #a5b4fc;">
+                    <div class="icon-kpi-wrapper" style="background-color: rgba(229, 167, 32, .18); color: #f6c64a;">
                         <i class="fas fa-truck fa-lg"></i>
                     </div>
                 </div>
@@ -164,7 +164,7 @@
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
                             <small class="stage-overdue text-muted">Gate In &rarr; masuk survey</small>
                         </div>
-                        <div class="icon-kpi-wrapper" style="background-color: rgba(59, 91, 253, .18); color: #a5b4fc;"><i class="fas fa-sign-in-alt fa-lg"></i></div>
+                        <div class="icon-kpi-wrapper" style="background-color: rgba(229, 167, 32, .18); color: #f6c64a;"><i class="fas fa-sign-in-alt fa-lg"></i></div>
                     </div>
                 </div>
             </div>

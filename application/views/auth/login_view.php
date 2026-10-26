@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0b1220">
+    <meta name="theme-color" content="#1c1d21">
     <title>LASMONO - Portal Akses Layanan Service Monitoring</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -15,12 +15,14 @@
         /* Panel hero */
         .hero { position: relative; overflow: hidden; background: var(--lx-ink); color: #fff; padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; }
         .hero::before, .hero::after { content: ""; position: absolute; border-radius: 50%; filter: blur(70px); opacity: .55; }
-        .hero::before { width: 420px; height: 420px; background: #3b5bfd; top: -120px; right: -120px; }
-        .hero::after { width: 360px; height: 360px; background: #6d4aff; bottom: -140px; left: -100px; }
+        .hero::before { width: 420px; height: 420px; background: #e5a720; top: -120px; right: -120px; }
+        .hero::after { width: 360px; height: 360px; background: #d72a2f; opacity: .35; bottom: -140px; left: -100px; }
         .hero > * { position: relative; z-index: 1; }
         .hero-grid { position: absolute; inset: 0; z-index: 0; opacity: .08; background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 44px 44px; mask-image: radial-gradient(circle at 30% 40%, #000, transparent 70%); }
-        .hero h1 { font-size: 44px; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; }
-        .hero h1 span { background: linear-gradient(90deg, #a5b4fc, #c4b5fd); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .hero h1 { font-family: var(--lx-font-display); font-size: 46px; font-weight: 400; line-height: 1.12; letter-spacing: .01em; }
+        .hero-avatar { position: absolute; right: 48px; top: 40px; z-index: 1; filter: drop-shadow(0 18px 40px rgba(0,0,0,.45)); }
+        .hero-avatar .lx-avatar { box-shadow: 0 0 0 6px rgba(246, 198, 74, .25); }
+        .hero h1 span { background: linear-gradient(90deg, #f6c64a, #fde3a0); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .hero p.lead-text { color: #cbd5e1; font-size: 16px; max-width: 460px; }
         .feature { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .08); backdrop-filter: blur(8px); }
         .feature .ico { width: 38px; height: 38px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -34,7 +36,7 @@
         /* Panel form */
         .panel { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
         .form-card { width: 100%; max-width: 420px; }
-        .seg { display: grid; grid-template-columns: 1fr 1fr; background: #eef1f7; padding: 5px; border-radius: 14px; gap: 4px; }
+        .seg { display: grid; grid-template-columns: 1fr 1fr; background: #f1ede4; padding: 5px; border-radius: 14px; gap: 4px; }
         .seg .nav-link { border-radius: 10px; color: var(--lx-muted); font-weight: 700; font-size: 14px; padding: 10px; border: none; background: transparent; width: 100%; }
         .seg .nav-link.active { background: #fff; color: var(--lx-text); box-shadow: 0 2px 8px rgba(15, 23, 42, .08); }
         .field { position: relative; }
@@ -61,10 +63,10 @@
     <?php $staff_error = $this->session->flashdata('error_staff'); $driver_error = $this->session->flashdata('error_driver'); ?>
     <div class="shell">
         <!-- Hero / branding -->
-        <section class="hero">
-            <div class="hero-grid"></div>
+        <section class="hero lx-waves">
+            <div class="hero-avatar d-none d-xl-block"><?php $this->load->view('partials/logo', array('size' => 190)); ?></div>
             <div class="d-flex align-items-center gap-3">
-                <span class="lx-logo"><i class="fas fa-cubes-stacked"></i></span>
+                <?php $this->load->view('partials/logo', array('size' => 44)); ?>
                 <div>
                     <div class="lx-brand fs-5">LASMONO</div>
                     <div class="small text-secondary">Depo Petikemas MTKI</div>
@@ -73,17 +75,18 @@
 
             <div class="my-4 my-lg-0">
                 <div class="stack d-none d-lg-flex">
-                    <i style="height: 34px; background-color: rgba(59, 91, 253, .55);"></i>
-                    <i style="height: 52px; background-color: rgba(109, 74, 255, .55);"></i>
+                    <i style="height: 34px; background-color: rgba(229, 167, 32, .55);"></i>
+                    <i style="height: 52px; background-color: rgba(246, 198, 74, .55);"></i>
                     <i style="height: 40px; background-color: rgba(16, 185, 129, .45);"></i>
                     <i style="height: 62px; background-color: rgba(245, 158, 11, .45);"></i>
                 </div>
-                <h1 class="mb-3">Layanan Service <span>Monitoring</span><br>Container Yard</h1>
+                <h1 class="mb-2">Layanan Service <span>Monitoring</span><br>Container Yard</h1>
+                <span class="lx-squiggle mb-3"></span>
                 <p class="lead-text mb-4">Antrean truk transparan, proses depo terpantau real-time, dan setiap tahap terukur sesuai KPI.</p>
 
                 <div class="features d-grid gap-2" style="max-width: 460px;">
                     <div class="feature">
-                        <span class="ico" style="background: rgba(59, 91, 253, .2); color: #a5b4fc;"><i class="fas fa-list-ol"></i></span>
+                        <span class="ico" style="background: rgba(229, 167, 32, .2); color: #f6c64a;"><i class="fas fa-list-ol"></i></span>
                         <div><b>Antrean FIFO transparan</b><small>Nomor & posisi antrean terlihat langsung di HP supir</small></div>
                     </div>
                     <div class="feature">
@@ -97,14 +100,18 @@
                 </div>
             </div>
 
-            <div class="hero-foot small text-secondary">&copy; <?= date('Y'); ?> Depo Petikemas MTKI &middot; Samudera Logistics</div>
+            <div class="hero-foot small d-flex align-items-center gap-2" style="color: #a9adb6;">
+                <span class="lx-stripes"><i></i><i></i><i></i></span>
+                <span>&copy; <?= date('Y'); ?> Depo Petikemas MTKI &middot; Bagian dari <b style="color: #fff;">Samudera Group</b></span>
+            </div>
         </section>
 
         <!-- Form login -->
         <section class="panel">
             <div class="form-card p-1 lx-rise">
                 <div class="mb-4">
-                    <h3 class="fw-bold mb-1">Selamat datang 👋</h3>
+                    <h3 class="lx-display mb-1" style="font-size: 30px;">Selamat Datang</h3>
+                    <span class="lx-squiggle mb-2"></span>
                     <p class="text-secondary mb-0">Masuk sesuai peran Anda untuk melanjutkan.</p>
                 </div>
 

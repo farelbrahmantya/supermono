@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#0b1220">
+    <meta name="theme-color" content="#1c1d21">
     <title>LASMONO - Interface Supir</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -14,8 +14,8 @@
 
         /* Header gradasi */
         .head { position: relative; overflow: hidden; background: var(--lx-ink); color: #fff; padding: 20px 20px 92px; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; }
-        .head::before { content: ""; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: #3b5bfd; filter: blur(80px); opacity: .55; top: -140px; right: -90px; }
-        .head::after { content: ""; position: absolute; width: 240px; height: 240px; border-radius: 50%; background: #6d4aff; filter: blur(80px); opacity: .45; bottom: -150px; left: -60px; }
+        .head::before { content: ""; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: #e5a720; filter: blur(80px); opacity: .55; top: -140px; right: -90px; }
+        .head::after { content: ""; position: absolute; width: 240px; height: 240px; border-radius: 50%; background: #d72a2f; filter: blur(80px); opacity: .3; bottom: -150px; left: -60px; }
         .head > * { position: relative; z-index: 1; }
         .plate { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 6px 12px; font-weight: 800; letter-spacing: .06em; }
 
@@ -23,7 +23,7 @@
         .card-app { background: #fff; border-radius: 22px; border: 1px solid var(--lx-border); box-shadow: var(--lx-shadow); padding: 20px; margin-bottom: 14px; }
 
         /* Nomor antrean */
-        .queue-no { font-size: clamp(24px, 8.4vw, 34px); white-space: nowrap; font-weight: 800; letter-spacing: -0.02em; background: var(--lx-grad); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.15; }
+        .queue-no { font-size: clamp(24px, 8.4vw, 34px); white-space: nowrap; font-weight: 800; letter-spacing: -0.02em; background: var(--lx-grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.15; }
         .meta-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 
         /* Lokasi */
@@ -37,21 +37,21 @@
         .step { flex: 1; text-align: center; font-size: 11px; font-weight: 600; color: #94a3b8; position: relative; }
         .step:not(:last-child)::after { content: ""; position: absolute; top: 15px; left: calc(50% + 18px); right: calc(-50% + 18px); height: 3px; border-radius: 3px; background: #e2e8f0; }
         .step.done:not(:last-child)::after { background: var(--lx-success); }
-        .step .dot { width: 32px; height: 32px; border-radius: 50%; background: #eef1f6; color: #94a3b8; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-weight: 800; font-size: 13px; }
+        .step .dot { width: 32px; height: 32px; border-radius: 50%; background: #f1ede4; color: #94a3b8; display: flex; align-items: center; justify-content: center; margin: 0 auto 6px; font-weight: 800; font-size: 13px; }
         .step.done .dot { background: var(--lx-success); color: #fff; }
-        .step.active .dot { background: var(--lx-grad); color: #fff; box-shadow: 0 0 0 5px rgba(59, 91, 253, .15); }
+        .step.active .dot { background: var(--lx-grad); color: var(--lx-ink); box-shadow: 0 0 0 5px rgba(229, 167, 32, .15); }
         .step.active, .step.done { color: var(--lx-text); }
 
         /* Cincin timer */
         .ring { position: relative; width: 210px; height: 210px; margin: 6px auto 12px; }
         .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
-        .ring .track { stroke: #eef1f6; }
+        .ring .track { stroke: #f1ede4; }
         .ring .bar { stroke: url(#ringGrad); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
         .ring.late .bar { stroke: var(--lx-danger); }
         .ring .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .ring .time { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
         .ring.late .time { color: var(--lx-danger); }
-        .timer-total { display: inline-flex; align-items: center; gap: 8px; background: #f1f5ff; color: #2f47d6; border-radius: 50px; padding: 8px 16px; font-size: 13px; font-weight: 600; }
+        .timer-total { display: inline-flex; align-items: center; gap: 8px; background: #fff6dc; color: #8a5a00; border-radius: 50px; padding: 8px 16px; font-size: 13px; font-weight: 600; }
         .timer-total b { font-variant-numeric: tabular-nums; }
         .timer-total.late { background: #fee2e2; color: #b91c1c; }
 
@@ -84,10 +84,10 @@
     ?>
     <div class="app">
         <!-- Header Informasi Armada -->
-        <div class="head">
+        <div class="head lx-waves">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="d-flex align-items-center gap-2">
-                    <span class="lx-logo" style="width: 36px; height: 36px; font-size: 15px;"><i class="fas fa-cubes-stacked"></i></span>
+                    <?php $this->load->view('partials/logo', array('size' => 36)); ?>
                     <div>
                         <div class="lx-brand">LASMONO</div>
                         <div class="small" style="color: #94a3b8;">Portal Supir</div>
@@ -95,7 +95,7 @@
                 </div>
                 <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
             </div>
-            <div class="mt-3"><span class="plate"><i class="fas fa-truck-front" style="color: #a5b4fc;"></i><?= html_escape($queue->license_plate); ?></span></div>
+            <div class="mt-3"><span class="plate"><i class="fas fa-truck-front" style="color: #f6c64a;"></i><?= html_escape($queue->license_plate); ?></span></div>
         </div>
 
         <div class="content">
@@ -115,6 +115,7 @@
             <!-- Nomor Antrean & FIFO -->
             <div class="card-app text-center lx-rise">
                 <div class="lx-eyebrow mb-1">Nomor Antrean Anda</div>
+                <span class="lx-squiggle center mb-2"></span>
                 <div class="queue-no mb-2">#<?= html_escape($queue->queue_number); ?></div>
                 <div class="meta-row">
                     <span id="positionBadge" class="lx-pill lx-pill-blue" <?= $queue_position === NULL ? 'style="display:none;"' : ''; ?>><i class="fas fa-list-ol"></i><span>Urutan ke-<span id="queuePosition"><?= $queue_position; ?></span></span></span>
@@ -153,7 +154,7 @@
                     <div class="lx-eyebrow">Timer Tahap &middot; <span id="stageLabel" style="color: var(--lx-primary);"><?= html_escape($timer['stage_label']); ?></span></div>
                     <div class="ring" id="stageCircle">
                         <svg viewBox="0 0 200 200">
-                            <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#3b5bfd"/><stop offset="100%" stop-color="#6d4aff"/></linearGradient></defs>
+                            <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#e5a720"/><stop offset="100%" stop-color="#f6c64a"/></linearGradient></defs>
                             <circle class="track" cx="100" cy="100" r="88" fill="none" stroke-width="14"/>
                             <circle class="bar" id="stageBar" cx="100" cy="100" r="88" fill="none" stroke-width="14" stroke-dasharray="552.92" stroke-dashoffset="0"/>
                         </svg>
@@ -188,7 +189,7 @@
                     </div>
                 <?php else: ?>
                     <div class="empty-state py-2">
-                        <span class="ico" style="background: #eef2ff; color: var(--lx-primary);"><i class="fas fa-qrcode"></i></span>
+                        <span class="ico" style="background: #fff3d1; color: var(--lx-primary);"><i class="fas fa-qrcode"></i></span>
                         <div class="fw-bold mb-1">Barcode muncul setelah Gate In</div>
                         <div class="small text-secondary">Siapkan kitir Anda untuk di-scan oleh security di Gate In.</div>
                     </div>

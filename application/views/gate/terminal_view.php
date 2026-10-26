@@ -17,7 +17,7 @@
         .mode-banner > * { position: relative; z-index: 1; }
         .mode-banner.gate-in { background: linear-gradient(135deg, #059669 0%, #0d9488 100%); }
         .mode-banner.gate-out { background: linear-gradient(135deg, #e11d48 0%, #be123c 100%); }
-        .mode-banner.control-tower { background: var(--lx-grad); }
+        .mode-banner.control-tower { background: linear-gradient(135deg, #1c1d21 0%, #30323a 100%); border-bottom: 4px solid var(--lx-primary); }
         .mode-icon { width: 58px; height: 58px; border-radius: 18px; background: rgba(255, 255, 255, .18); border: 1px solid rgba(255, 255, 255, .25); display: inline-flex; align-items: center; justify-content: center; font-size: 24px; }
         .live-chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .25); padding: 8px 14px; border-radius: 50px; font-size: 13px; font-weight: 700; }
         .live-chip i { color: #86efac; animation: lx-pulse 1.6s infinite; }
@@ -26,12 +26,12 @@
         .scanner-card, .recent-card { background: #fff; border: 1px solid var(--lx-border); border-radius: 22px; box-shadow: var(--lx-shadow); }
         .scanner-card { padding: 36px; text-align: center; }
         .recent-card { padding: 22px; }
-        .scan-icon { width: 76px; height: 76px; border-radius: 24px; background: #eef2ff; color: var(--lx-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 14px; }
+        .scan-icon { width: 76px; height: 76px; border-radius: 24px; background: #fff3d1; color: var(--lx-primary); display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 14px; }
         .barcode-box-wrapper { position: relative; max-width: 600px; margin: 0 auto; }
         .barcode-input { background: #f8fafc; border: 2px dashed #cbd5e1; color: var(--lx-text); font-size: 26px; font-weight: 800; text-align: center; border-radius: 18px; padding: 22px; letter-spacing: 4px; text-transform: uppercase; transition: all .2s ease; }
         .barcode-input::placeholder { color: #b6c0d1; letter-spacing: 6px; }
-        .barcode-input:focus { background: #fff; border: 2px solid var(--lx-primary); box-shadow: 0 0 0 6px rgba(59, 91, 253, .12); outline: none; }
-        .laser-line-subtle { position: absolute; bottom: 10px; left: 15%; width: 70%; height: 3px; border-radius: 3px; background: var(--lx-grad); box-shadow: 0 0 12px rgba(59, 91, 253, .6); animation: pulseLaser 2s infinite ease-in-out; }
+        .barcode-input:focus { background: #fff; border: 2px solid var(--lx-primary); box-shadow: 0 0 0 6px rgba(229, 167, 32, .12); outline: none; }
+        .laser-line-subtle { position: absolute; bottom: 10px; left: 15%; width: 70%; height: 3px; border-radius: 3px; background: var(--lx-grad); box-shadow: 0 0 12px rgba(229, 167, 32, .6); animation: pulseLaser 2s infinite ease-in-out; }
         @keyframes pulseLaser { 0%, 100% { opacity: .25; transform: scaleX(.8); } 50% { opacity: 1; transform: scaleX(1); } }
         .scan-tips { display: inline-flex; gap: 18px; color: var(--lx-muted); font-size: 13px; font-weight: 600; }
         .scan-tips i { color: var(--lx-success); }
@@ -42,14 +42,14 @@
         .alert-danger.status-toast { background: #fef2f2; color: #b91c1c !important; }
 
         /* Panel kitir */
-        #kitirPanel { background: linear-gradient(180deg, #f8faff, #fff); border: 1px solid #dbe3ff !important; border-radius: 20px !important; padding: 20px !important; }
+        #kitirPanel { background: linear-gradient(180deg, #fffbf0, #fff); border: 1px solid #f6e2a8 !important; border-radius: 20px !important; padding: 20px !important; }
         #kitirPanel .table td { border-color: #eef1f7; padding: 8px 4px; }
 
         /* Tabel */
         .table-custom { margin: 0; }
         .table-custom th { background: #f8fafc; color: var(--lx-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--lx-border); padding: 12px 14px; }
         .table-custom td { padding: 13px 14px; vertical-align: middle; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-        #pendingGateInBody tr[data-queue]:hover td { background: #f5f7ff; }
+        #pendingGateInBody tr[data-queue]:hover td { background: #fff8e6; }
         .section-title { font-weight: 800; font-size: 16px; }
         .section-title i { width: 32px; height: 32px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; margin-right: 8px; }
     </style>
@@ -59,7 +59,7 @@
     <!-- Top Navbar -->
     <header class="lx-topbar d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <span class="lx-logo"><i class="fas fa-cubes-stacked"></i></span>
+            <?php $this->load->view('partials/logo', array('size' => 44)); ?>
             <div>
                 <div class="lx-brand">LASMONO <span class="fw-semibold" style="color: #94a3b8;">Security Terminal</span></div>
                 <div class="lx-sub">Otomasi gerbang &amp; transparansi FIFO depo</div>
@@ -67,7 +67,7 @@
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="lx-user d-none d-md-inline-flex">
-                <i class="fas fa-user-shield" style="color: #a5b4fc;"></i>
+                <i class="fas fa-user-shield" style="color: #f6c64a;"></i>
                 <span><span style="color: #94a3b8;">Petugas</span> <b><?= html_escape($this->session->userdata('name')); ?></b></span>
                 <a href="<?= base_url('auth/logout'); ?>" class="lx-icon-btn" title="Keluar"><i class="fas fa-arrow-right-from-bracket"></i></a>
             </span>
@@ -159,7 +159,7 @@
                 <div class="recent-card h-100">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6 class="section-title mb-0">
-                            <i class="fas fa-clock-rotate-left" style="background: #eef2ff; color: var(--lx-primary);"></i>Transaksi Terakhir
+                            <i class="fas fa-clock-rotate-left" style="background: #fff3d1; color: var(--lx-primary);"></i>Transaksi Terakhir
                         </h6>
                         <span class="lx-pill lx-pill-blue" id="totalProcessedCount">0 Truk Hari Ini</span>
                     </div>

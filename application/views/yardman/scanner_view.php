@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0b1220">
+    <meta name="theme-color" content="#1c1d21">
     <title>LASMONO - Yardman Scanner</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,9 +11,9 @@
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        :root { --ink: #0b1220; --ink-2: #131c2e; --blue: #3b5bfd; --green: #10b981; --amber: #f59e0b; --red: #ef4444; }
+        :root { --ink: #1c1d21; --ink-2: #26282e; --blue: #e5a720; --green: #10b981; --amber: #f59e0b; --red: #ef4444; }
         .top { position: relative; overflow: hidden; }
-        .top::before { content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%; background: #3b5bfd; filter: blur(90px); opacity: .35; top: -150px; right: -80px; }
+        .top::before { content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%; background: #e5a720; filter: blur(90px); opacity: .35; top: -150px; right: -80px; }
         .top > * { position: relative; z-index: 1; }
         .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
 
@@ -68,7 +68,7 @@
         .sheet.offcanvas-bottom { height: auto; max-height: 88vh; border-top-left-radius: 24px; border-top-right-radius: 24px; }
         .sheet .grabber { width: 44px; height: 5px; border-radius: 5px; background: #cbd5e1; margin: 10px auto 0; }
         .step-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 50px; }
-        .step-1 { background: #dbeafe; color: #1d4ed8; }
+        .step-1 { background: #fff3d1; color: #8a5a00; }
         .step-2 { background: #d1fae5; color: #047857; }
         .container-no { font-size: 30px; font-weight: 800; letter-spacing: .5px; color: #0f172a; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -91,11 +91,11 @@
 </head>
 <body>
     <div class="app">
-        <div class="top">
+        <div class="top lx-waves">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <div class="d-flex align-items-center gap-2">
-                        <span class="lx-logo" style="width: 36px; height: 36px; font-size: 15px;"><i class="fas fa-cubes-stacked"></i></span>
+                        <?php $this->load->view('partials/logo', array('size' => 36)); ?>
                         <div>
                             <div class="d-flex align-items-center gap-2"><span class="lx-brand">LASMONO</span><span class="badge bg-warning text-dark fw-bold brand-badge">YARDMAN</span></div>
                             <small style="color: #94a3b8;"><?= html_escape($this->session->userdata('name')); ?></small>
