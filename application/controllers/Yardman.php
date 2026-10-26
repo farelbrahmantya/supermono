@@ -167,17 +167,17 @@ class Yardman extends MY_Controller {
             $update['current_zone_id'] = $zone->id;
         }
 
-        // Export: nomor container dipilih Yardman di lapangan, wajib cocok dengan new_sby
-        if ($queue->activity === 'D' || !$queue->container_no) {
-            $container = $this->_validate_container($queue, $this->input->post('container_no'));
-            if (!is_object($container)) {
-                $this->_json($container);
-                return;
-            }
-            $update['container_no']   = $container->container_no;
-            $update['container_size'] = $container->size;
-            $queue->container_no      = $container->container_no;
+        // Export: nomor container dipilih Yardman di lapangan; Repo Out: container yang sudah diplot.
+        // Keduanya wajib cocok dengan new_sby (status, kondisi, principal, tipe)
+        $picked    = ($queue->activity === 'D' || !$queue->container_no) ? $this->input->post('container_no') : $queue->container_no;
+        $container = $this->_validate_container($queue, $picked);
+        if (!is_object($container)) {
+            $this->_json($container);
+            return;
         }
+        $update['container_no']   = $container->container_no;
+        $update['container_size'] = $container->size;
+        $queue->container_no      = $container->container_no;
 
         if (!$this->_transition($queue->id, 'IN_YARD', $update)) {
             $this->_json(array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
@@ -191,8 +191,8 @@ class Yardman extends MY_Controller {
         ));
     }
 
-    // Container pilihan Yardman: terdaftar di new_sby, ada di depo, principal sama dengan kitir,
-    // dan tidak sedang dipakai truk lain. Mengembalikan data container atau array respon error.
+    // Container yang dimuat: terdaftar di new_sby, status & kondisi boleh dimuat (Export CO+AC,
+    // Repo Out CO/WA + AC/DN), principal & tipe sama dengan kitir, dan tidak sedang dipakai truk lain. Mengembalikan data container atau array respon error.
     private function _validate_container($queue, $container_no) {
         $container_no = preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $container_no));
         if (!preg_match('/^[A-Z]{4}\d{7}$/', $container_no)) {
@@ -207,8 +207,12 @@ class Yardman extends MY_Controller {
         if (!$this->kitir_model->same_principal($container->principal, $queue->principal)) {
             return array('status' => 'error', 'message' => "Principal tidak sesuai!\nContainer {$container_no} milik " . ($container->principal ? $container->principal : '(kosong)') . ", kitir untuk {$queue->principal}.");
         }
-        if (!$container->in_depot) {
-            return array('status' => 'error', 'message' => "Container {$container_no} tidak tercatat di depo (aktivitas terakhir: " . ($container->last_act ? $container->last_act : '-') . ').');
+        if ($queue->container_size !== NULL && $queue->container_size !== '' && $container->size !== '' && $container->size !== $queue->container_size) {
+            return array('status' => 'error', 'message' => "Tipe container tidak sesuai!\nContainer {$container_no} {$container->size}, kitir meminta {$queue->container_size}.");
+        }
+        $problem = $this->kitir_model->load_problem($container, $queue->activity);
+        if ($problem !== NULL) {
+            return array('status' => 'error', 'message' => "Container {$container_no} belum bisa dimuat:\n{$problem}.");
         }
 
         $used = $this->db->where('container_no', $container_no)
@@ -227,6 +231,7 @@ class Yardman extends MY_Controller {
         if ($this->kitir_model->parse_barcode($input) !== FALSE) {
             $kitir = $this->kitir_model->find_by_barcode($input);
             $queue = $kitir ? $this->db->where('cp_id', $kitir->cp_id)
+                                       ->where_in('activity', $this->_activity_group($kitir->activity))
                                        ->where_in('status', $this->in_depo_statuses)
                                        ->order_by('id', 'DESC')
                                        ->get('queue_transactions', 1)->row() : NULL;

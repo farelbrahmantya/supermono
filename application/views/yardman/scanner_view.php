@@ -583,7 +583,7 @@
                     $('#pickContainerInput').val(c.container_no);
                     $('#sheetContainer').text(c.container_no);
                     $('#sheetSize').text(c.size || '-');
-                    $('#pickResult').html('<span class="text-success fw-semibold"><i class="fas fa-circle-check me-1"></i>Cocok: ' + esc(c.principal) + ' &middot; ' + esc(c.size || c.iso_code || '-') + ' &middot; ada di depo</span>');
+                    $('#pickResult').html('<span class="text-success fw-semibold"><i class="fas fa-circle-check me-1"></i>Cocok: ' + esc(c.principal) + ' &middot; ' + esc(c.size || c.iso_code || '-') + ' &middot; status ' + esc(c.last_act) + ' / ' + esc(c.last_cond) + ' (boleh dimuat)</span>');
                 }
                 updateConfirmState();
             }, function() {

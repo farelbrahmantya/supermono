@@ -328,16 +328,27 @@ class Control_tower extends MY_Controller {
                 'status_label'    => $label,
                 'badge_class'     => $badge,
                 'elapsed_minutes' => $elapsed,
+                // Total sejak Gate In dibanding target SLA aktivitas
+                'sla_target'      => $q->status === 'WAITING_GATE' ? NULL : (int) $q->sla_target_minutes,
+                'sla_level'       => $q->status === 'WAITING_GATE' ? NULL : $this->_sla_level($elapsed, (int) $q->sla_target_minutes),
                 'estimated_call'  => $estimated_call,
                 // Tahap yang sedang ditunggu & lama menunggu di tahap itu (KPI per tahap di dalam depo)
                 'stage'           => $stage ? $stage[0] : 'antre',
                 'stage_target'    => $stage ? $stage[3] : NULL,
                 'stage_minutes'   => $stage_minutes,
-                'stage_overdue'   => $stage !== NULL && $stage_minutes > $stage[3]
+                'stage_overdue'   => $stage !== NULL && $stage_minutes > $stage[3],
+                'stage_level'     => $stage === NULL ? NULL : $this->_sla_level($stage_minutes, $stage[3])
             );
         }
 
         return $queues;
+    }
+
+    // Tingkat SLA: ok (< 80% target), warning (>= 80%), over (melebihi target)
+    private function _sla_level($minutes, $target) {
+        if ($minutes > $target) return 'over';
+        if ($minutes >= $target * 0.8) return 'warning';
+        return 'ok';
     }
 
     // KPI per tahap untuk truk yang Gate Out hari ini: rata-rata menit & jumlah yang mencapai target

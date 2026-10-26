@@ -203,6 +203,7 @@ class Gate extends MY_Controller {
         }
 
         $used = $this->db->where('cp_id', $kitir->cp_id)
+                     ->where_in('activity', $this->_activity_group($kitir->activity))
                          ->where_not_in('status', array('COMPLETED', 'CANCELLED'))
                          ->get('queue_transactions')->row();
         if ($used) {
@@ -219,6 +220,7 @@ class Gate extends MY_Controller {
             return array('status' => 'error', 'message' => 'Data kitir ' . strtoupper(trim((string) $barcode)) . ' tidak ditemukan di database depo.');
         }
         $queue = $this->db->where('cp_id', $kitir->cp_id)
+                      ->where_in('activity', $this->_activity_group($kitir->activity))
                           ->where_in('status', $this->in_depo_statuses)
                           ->order_by('id', 'DESC')
                           ->get('queue_transactions', 1)->row();

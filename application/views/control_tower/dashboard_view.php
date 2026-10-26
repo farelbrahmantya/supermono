@@ -43,6 +43,17 @@
         .badge-pill-status { border-radius: 50px; padding: 6px 12px; font-weight: 700; font-size: 12px; }
         .badge-yard { background: #fff3d1; color: #8a5a00; }
         .badge-waiting { background: #f1f2f4; color: #4b5059; }
+        /* Waktu vs target: hijau aman, kuning >= 80% target, merah lewat target */
+        .sla-chip { display: inline-block; min-width: 74px; text-align: center; padding: 4px 10px; border-radius: 8px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+        .sla-ok { background: #dcfce7; color: #047857; }
+        .sla-warning { background: #fef3c7; color: #b45309; }
+        .sla-over { background: var(--lx-red); color: #fff; animation: lx-pulse 1.5s infinite; }
+        .sla-none { background: #f1f2f4; color: #4b5059; }
+        tr.row-over td { background: #fff5f5; }
+        tr.row-over td:first-child { box-shadow: inset 4px 0 0 var(--lx-red); }
+        tr.row-warning td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
+        .sla-legend { font-size: 12px; color: var(--lx-muted); }
+        .sla-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin: 0 4px 0 10px; vertical-align: -1px; }
         .badge-over-sla { background: var(--lx-red); color: #fff; animation: lx-pulse 1.5s infinite; }
 
         /* Tombol header */
@@ -211,6 +222,7 @@
                 <div class="card-section">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="fw-bold mb-0">Live Antrean (SLA Monitor)</h5>
+                        <span class="sla-legend d-none d-md-inline">Time vs target:<i class="sla-ok"></i>On track<i class="sla-warning"></i>&ge; 80%<i class="sla-over"></i>Over SLA</span>
                         <span id="stageFilterBadge" class="badge bg-primary rounded-pill px-3 py-2" role="button" style="display:none;"></span>
                     </div>
                     <div class="table-responsive">
@@ -221,8 +233,8 @@
                                     <th>License Plate</th>
                                     <th>Container</th>
                                     <th>Status</th>
-                                    <th>Di Tahap Ini</th>
-                                    <th>Elapsed Time</th>
+                                    <th title="Time in the current stage / stage target">Stage Time</th>
+                                    <th title="Total time since Gate In / SLA target (queue time before Gate In)">Elapsed Time</th>
                                     <th>Estimated Call</th>
                                 </tr>
                             </thead>
@@ -399,15 +411,19 @@
             }
 
             let html = '';
+            function chip(minutes, target, level) {
+                return '<span class="sla-chip sla-' + (level || 'none') + '">' + esc(minutes) + (target ? ' / ' + esc(target) : '') + ' min</span>';
+            }
             rows.forEach(function(q) {
-                html += '<tr>' +
+                let worst = (q.stage_level === 'over' || q.sla_level === 'over') ? 'over' : ((q.stage_level === 'warning' || q.sla_level === 'warning') ? 'warning' : '');
+                html += '<tr class="' + (worst ? 'row-' + worst : '') + '">' +
                     '<td class="fw-bold">' + esc(q.queue_number) + '<br><span class="act-tag act-' + esc(q.activity) + '">' + esc(q.activity_label) + '</span></td>' +
                     '<td class="fw-semibold">' + esc(q.license_plate) + '</td>' +
                     '<td>' + esc(q.container_no || '-') + '</td>' +
                     '<td><span class="badge badge-pill-status ' + esc(q.badge_class) + '">' + esc(q.status_label) + '</span></td>' +
-                    '<td><span class="badge ' + (q.stage_overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(q.stage_minutes) + (q.stage_target ? ' / ' + esc(q.stage_target) : '') + ' mnt</span></td>' +
-                    '<td>' + esc(q.elapsed_minutes) + ' Menit</td>' +
-                    '<td>' + (q.estimated_call === null ? '-' : esc(q.estimated_call) + ' Menit') + '</td>' +
+                    '<td>' + chip(q.stage_minutes, q.stage_target, q.stage_level) + '</td>' +
+                    '<td>' + chip(q.elapsed_minutes, q.sla_target, q.sla_level) + '</td>' +
+                    '<td>' + (q.estimated_call === null ? '-' : esc(q.estimated_call) + ' min') + '</td>' +
                 '</tr>';
             });
             if (!rows.length) {

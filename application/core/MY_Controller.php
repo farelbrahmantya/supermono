@@ -26,6 +26,12 @@ class MY_Controller extends CI_Controller {
         return in_array($activity, array('D', 'E'), TRUE);
     }
 
+    // Kitir bongkar (Z/A, nomor dari coins_container_process) dan muat (D/E, nomor dari book_detail_cpid)
+    // memakai sumber nomor berbeda; cp_id antrean hanya dibandingkan di kelompok yang sama
+    protected function _activity_group($activity) {
+        return $this->_is_muat($activity) ? array('D', 'E') : array('Z', 'A');
+    }
+
     protected function _activity_label($activity) {
         return isset($this->activities[$activity]) ? $this->activities[$activity] : $this->activities['Z'];
     }
