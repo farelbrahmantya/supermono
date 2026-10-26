@@ -25,6 +25,8 @@ $config['sso_branch'] = '003';
 // Kunci yang bisa dipakai: user (tbluser.user), kddept, posisi (daftar, tanpa beda huruf besar/kecil), staff_type.
 // Role GATE = Security: setelah login bisa berpindah Gate In / Gate Out.
 $config['sso_rules'] = array(
+    // Akses penuh (Control Tower dapat membuka Control Tower, Gate In/Out, Yardman, Riwayat, Layar TV)
+    array('role' => 'CONTROL_TOWER', 'user' => 'farel.sby', 'kddept' => '008', 'posisi' => array('SECTION HEAD'), 'staff_type' => 'Internal'),
     array('role' => 'GATE',          'user' => 'security.sby'),
     array('role' => 'GATE',          'kddept' => '999', 'posisi' => array('SECURITY')),
     array('role' => 'CONTROL_TOWER', 'kddept' => '007', 'posisi' => array('SECTION HEAD', 'DEPARTMENT HEAD', 'DEPT HEAD', 'DEPT. HEAD'), 'staff_type' => 'Internal'),
