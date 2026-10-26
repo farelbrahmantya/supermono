@@ -3,142 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0b1220">
     <title>LASMONO - Yardman Scanner</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        :root { --primary-dark: #0b1e38; --accent-blue: #2563eb; --accent-green: #10b981; }
-        body { background-color: #f1f5f9; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .app-header { background-color: var(--primary-dark); color: white; padding: 18px 20px; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.12); }
-        .card-custom { background: #ffffff; border-radius: 18px; border: none; box-shadow: 0 4px 20px rgba(0,0,0,0.04); overflow: hidden; }
-        
-        /* Bounding Frame & Laser Animation */
-        .scanner-container { position: relative; border-radius: 14px; overflow: hidden; background: #000; }
-        #reader { width: 100%; min-height: 250px; }
-        .laser-line {
-            position: absolute; top: 0; left: 5%; width: 90%; height: 3px;
-            background: linear-gradient(90deg, rgba(239,68,68,0) 0%, #ef4444 50%, rgba(239,68,68,0) 100%);
-            box-shadow: 0 0 12px #ef4444; z-index: 10;
-            animation: scanLaser 2s infinite ease-in-out;
-        }
-        @keyframes scanLaser {
-            0% { top: 5%; }
-            50% { top: 90%; }
-            100% { top: 5%; }
-        }
+        :root { --ink: #0b1220; --ink-2: #131c2e; --blue: #2563eb; --green: #10b981; --amber: #f59e0b; --red: #ef4444; }
+        body { background: #eef2f7; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
 
-        .btn-torch { background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 50px; padding: 6px 16px; font-size: 12px; font-weight: 600; }
-        .btn-torch:hover, .btn-torch.active { background: #f59e0b; color: #000; border-color: #f59e0b; }
-        
-        .recent-item { padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; }
-        .recent-item:last-child { border-bottom: none; }
+        /* Header + panel kamera gelap ala aplikasi kamera */
+        .top { background: var(--ink); color: #fff; padding: 16px 16px 20px; border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
+        .brand-badge { font-size: 10px; letter-spacing: .5px; }
+        .icon-btn { width: 40px; height: 40px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.15); }
+        .icon-btn:hover { color: #fff; background: rgba(255,255,255,.18); }
+
+        .stat-chips { display: flex; gap: 8px; margin: 14px 0; }
+        .stat-chip { flex: 1; background: var(--ink-2); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 10px 12px; color: #fff; text-align: left; }
+        .stat-chip .num { font-size: 22px; font-weight: 800; line-height: 1; }
+        .stat-chip small { color: #94a3b8; font-size: 11px; }
+        .stat-chip.late { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
+
+        .cam { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 20px; overflow: hidden; background: #000; }
+        #reader { position: absolute; inset: 0; border: none !important; }
+        #reader > div { display: none !important; } /* label "Scanner paused" bawaan library */
+        #reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+        #reader img, #reader canvas, #qr-shaded-region { display: none !important; }
+
+        /* Bingkai pindai: area luar digelapkan, sudut bingkai, garis pindai */
+        .cam-frame { position: absolute; top: 50%; left: 50%; width: 68%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-radius: 18px; box-shadow: 0 0 0 999px rgba(5, 10, 20, .55); pointer-events: none; }
+        .cam-frame i { position: absolute; width: 34px; height: 34px; border: 4px solid #fff; }
+        .cam-frame i:nth-child(1) { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 18px; }
+        .cam-frame i:nth-child(2) { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 18px; }
+        .cam-frame i:nth-child(3) { bottom: -2px; left: -2px; border-right: 0; border-top: 0; border-bottom-left-radius: 18px; }
+        .cam-frame i:nth-child(4) { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-bottom-right-radius: 18px; }
+        .cam-frame .scanline { position: absolute; left: 8%; width: 84%; height: 2px; background: linear-gradient(90deg, transparent, #34d399, transparent); box-shadow: 0 0 12px #34d399; animation: scan 2.2s ease-in-out infinite; }
+        @keyframes scan { 0%, 100% { top: 8%; } 50% { top: 92%; } }
+        .cam.detected .cam-frame i { border-color: var(--green); }
+        .cam.paused .cam-frame .scanline { display: none; }
+
+        .cam-status { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(15, 23, 42, .75); backdrop-filter: blur(6px); color: #fff; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 50px; white-space: nowrap; }
+        .cam-tools { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .cam-tools .icon-btn { background: rgba(15, 23, 42, .6); backdrop-filter: blur(6px); }
+        .cam-tools .icon-btn.active { background: var(--amber); color: #111; border-color: var(--amber); }
+        .cam-off { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #cbd5e1; padding: 24px; background: radial-gradient(circle at center, #1e293b, #000); }
+        .cam.off .cam-off { display: flex; }
+
+        .manual { display: flex; gap: 8px; margin-top: 12px; }
+        .manual input { background: var(--ink-2); border: 1px solid rgba(255,255,255,.12); color: #fff; border-radius: 12px; font-weight: 700; text-transform: uppercase; }
+        .manual input::placeholder { color: #64748b; text-transform: none; font-weight: 500; }
+        .manual input:focus { background: var(--ink-2); color: #fff; border-color: var(--blue); box-shadow: none; }
+
+        .section { padding: 16px; }
+        .card-soft { background: #fff; border-radius: 18px; box-shadow: 0 4px 18px rgba(15, 23, 42, .05); padding: 14px 16px; }
+        .recent-item, .pending-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+        .recent-item:last-child, .pending-item:last-child { border-bottom: none; }
+
+        /* Lembar konfirmasi dari bawah */
+        .sheet.offcanvas-bottom { height: auto; max-height: 88vh; border-top-left-radius: 24px; border-top-right-radius: 24px; }
+        .sheet .grabber { width: 44px; height: 5px; border-radius: 5px; background: #cbd5e1; margin: 10px auto 0; }
+        .step-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 50px; }
+        .step-1 { background: #dbeafe; color: #1d4ed8; }
+        .step-2 { background: #d1fae5; color: #047857; }
+        .container-no { font-size: 30px; font-weight: 800; letter-spacing: .5px; color: #0f172a; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .info-grid div { background: #f8fafc; border-radius: 12px; padding: 8px 10px; }
+        .info-grid small { display: block; color: #64748b; font-size: 11px; }
+        .depo-tabs { display: flex; gap: 6px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
+        .depo-tabs button { flex: 1; border: none; background: transparent; padding: 8px; border-radius: 9px; font-weight: 700; color: #64748b; }
+        .depo-tabs button.active { background: #fff; color: #0f172a; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        .block-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .block-grid button { border: 2px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 12px 0; font-weight: 800; color: #334155; }
+        .block-grid button.active { border-color: var(--green); background: #ecfdf5; color: #047857; }
+        .btn-confirm { padding: 14px; border-radius: 14px; font-weight: 800; font-size: 16px; }
+
+        /* Kilat hasil sukses */
+        .flash { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; color: #fff; text-align: center; padding: 24px; background: rgba(16, 185, 129, .96); }
+        .flash.show { display: flex; animation: pop .25s ease-out; }
+        .flash i { font-size: 84px; margin-bottom: 14px; }
+        @keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
     </style>
 </head>
 <body>
-    <div class="container p-0" style="max-width: 480px;">
-        <!-- Header -->
-        <div class="app-header mb-3 d-flex justify-content-between align-items-center">
-            <div>
-                <div class="d-flex align-items-center gap-2">
-                    <h5 class="fw-bold mb-0">LASMONO</h5>
-                    <span class="badge bg-warning text-dark fw-bold" style="font-size: 10px;">YARDMAN PRO</span>
+    <div class="app">
+        <div class="top">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="fw-bold mb-0">LASMONO</h5>
+                        <span class="badge bg-warning text-dark fw-bold brand-badge">YARDMAN PRO</span>
+                    </div>
+                    <small class="text-secondary"><?= html_escape($this->session->userdata('name')); ?></small>
                 </div>
-                <small class="text-light opacity-75">Operational Verification Terminal</small>
+                <a href="<?= base_url('auth/logout'); ?>" class="icon-btn" title="Keluar"><i class="fas fa-power-off"></i></a>
             </div>
-            <a href="<?= base_url('auth/logout'); ?>" class="btn btn-outline-light btn-sm rounded-circle" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
-                <i class="fas fa-power-off"></i>
-            </a>
+
+            <!-- Ringkasan pending (ketuk untuk melihat daftar) -->
+            <div class="stat-chips">
+                <button type="button" class="stat-chip" id="chipWaiting" data-bs-toggle="offcanvas" data-bs-target="#pendingSheet">
+                    <div class="num" id="countWaiting">0</div><small>Menunggu masuk survey</small>
+                </button>
+                <button type="button" class="stat-chip" id="chipSurvey" data-bs-toggle="offcanvas" data-bs-target="#pendingSheet">
+                    <div class="num" id="countSurvey">0</div><small>Sedang survey</small>
+                </button>
+            </div>
+
+            <!-- Kamera -->
+            <div class="cam off" id="cam">
+                <div id="reader"></div>
+                <div class="cam-frame"><i></i><i></i><i></i><i></i><div class="scanline"></div></div>
+                <div class="cam-tools">
+                    <button type="button" class="icon-btn" id="btnTorch" title="Flash" style="display:none;"><i class="fas fa-bolt"></i></button>
+                    <button type="button" class="icon-btn" id="btnSwitch" title="Ganti kamera" style="display:none;"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div class="cam-status" id="camStatus">Arahkan kamera ke QR di HP supir</div>
+                <div class="cam-off">
+                    <i class="fas fa-camera fa-3x mb-3 opacity-75"></i>
+                    <div class="fw-semibold mb-1" id="camOffTitle">Kamera belum aktif</div>
+                    <small class="mb-3 opacity-75" id="camOffText">Ketuk tombol di bawah untuk mulai memindai.</small>
+                    <button type="button" class="btn btn-light fw-bold px-4 rounded-pill" id="btnStartCam"><i class="fas fa-play me-1"></i> Aktifkan Kamera</button>
+                </div>
+            </div>
+
+            <!-- Input manual -->
+            <div class="manual">
+                <input type="text" id="manualQueueInput" class="form-control" placeholder="Ketik no. antrean, contoh A-20261025-001" autocomplete="off">
+                <button type="button" id="btnManualSubmit" class="btn btn-primary fw-bold px-3" style="border-radius: 12px;"><i class="fas fa-arrow-right"></i></button>
+            </div>
         </div>
 
-        <div class="px-3">
-            <!-- Alert Notifikasi Toast -->
-            <div id="scanResult" style="display:none;" class="alert border-0 shadow-sm mb-3"></div>
-
-            <!-- Alur scan Yardman -->
-            <div class="card-custom p-3 mb-3 small">
-                <div class="fw-bold text-secondary mb-1"><i class="fas fa-info-circle me-1"></i> ALUR SCAN YARDMAN</div>
-                <div><span class="badge bg-primary me-1">Scan 1</span> Truk masuk area survey</div>
-                <div class="mt-1"><span class="badge bg-success me-1">Scan 2</span> Survey selesai &rarr; pilih Depo &amp; Blok dulu, lalu scan</div>
-            </div>
-
-            <!-- Pilih Depo & Blok (wajib saat scan 2 / survey selesai) -->
-            <?php if (!empty($zones)): ?>
-            <div class="card-custom p-3 mb-3">
-                <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-th me-1"></i> DEPO &amp; BLOK PENEMPATAN <span class="fw-normal">(untuk scan 2)</span></span>
-                <select id="zoneSelect" class="form-select fw-bold">
-                    <option value="">-- Pilih Depo &amp; Blok --</option>
-                    <?php $current_depo = NULL; ?>
-                    <?php foreach ($zones as $zone): ?>
-                        <?php if ($zone->depo !== $current_depo): ?>
-                            <?php if ($current_depo !== NULL): ?></optgroup><?php endif; ?>
-                            <optgroup label="<?= html_escape($zone->depo); ?>">
-                            <?php $current_depo = $zone->depo; ?>
-                        <?php endif; ?>
-                        <option value="<?= html_escape($zone->zone_code); ?>"><?= html_escape($zone->depo . ' - Blok ' . $zone->zone_code); ?></option>
-                    <?php endforeach; ?>
-                    <?php if ($current_depo !== NULL): ?></optgroup><?php endif; ?>
-                </select>
-            </div>
-            <?php endif; ?>
-
-            <!-- Card Scanner Utama -->
-            <div class="card-custom p-3 mb-3">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="fw-bold text-secondary small"><i class="fas fa-camera me-1"></i> PEMINDAI KAMERA</span>
-                    <div>
-                        <button id="btnTorch" class="btn btn-torch" style="display:none;">
-                            <i class="fas fa-bolt me-1"></i> Flash
-                        </button>
-                        <span id="scanStatusBadge" class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Kamera Aktif</span>
-                    </div>
+        <!-- Riwayat scan sesi ini -->
+        <div class="section">
+            <div class="card-soft">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold small text-secondary"><i class="fas fa-history me-1"></i> RIWAYAT SCAN</span>
+                    <small class="text-muted" id="recentCount">0 scan</small>
                 </div>
-
-                <!-- Bounding Box Frame Kamera -->
-                <div class="scanner-container mb-2">
-                    <div class="laser-line"></div>
-                    <div id="reader"></div>
-                </div>
-                <small class="text-muted text-center d-block" style="font-size: 11px;">Posisikan QR / Barcode Kitir tepat di dalam bingkai</small>
-            </div>
-
-            <!-- Card Input Manual -->
-            <div class="card-custom p-3 mb-3">
-                <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-keyboard me-1"></i> INPUT MANUAL KODE ANTREAN</span>
-                <div class="input-group">
-                    <input type="text" id="manualQueueInput" class="form-control fw-bold text-uppercase border-end-0" placeholder="Contoh: A-20261021-001" style="border-radius: 10px 0 0 10px;">
-                    <button id="btnManualSubmit" class="btn btn-primary fw-bold px-4" style="border-radius: 0 10px 10px 0;">PROSES</button>
-                </div>
-            </div>
-
-            <!-- Card Antrean Pending: sudah Gate In, belum diverifikasi Yardman -->
-            <div class="card-custom p-3 mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold text-secondary small"><i class="fas fa-hourglass-half me-1"></i> MENUNGGU MASUK SURVEY</span>
-                    <span class="badge bg-warning-subtle text-dark" id="pendingWaitingCount">0 Truk</span>
-                </div>
-                <div id="pendingWaitingList" class="mb-3"></div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold text-secondary small"><i class="fas fa-search me-1"></i> SEDANG SURVEY (BELUM SCAN 2)</span>
-                    <span class="badge bg-primary-subtle text-primary" id="pendingSurveyCount">0 Truk</span>
-                </div>
-                <div id="pendingSurveyList"></div>
-            </div>
-
-            <!-- Card Riwayat Pindai Terakhir -->
-            <div class="card-custom p-3 mb-4">
-                <span class="fw-bold text-secondary small d-block mb-2"><i class="fas fa-history me-1"></i> RIWAYAT SCAN TERAKHIR</span>
                 <div id="recentScanList">
-                    <div class="text-center py-3 text-muted small" id="emptyRecentText">Belum ada riwayat pemindaian.</div>
+                    <div class="text-center py-3 text-muted small" id="emptyRecentText">Belum ada scan pada sesi ini.</div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Lembar konfirmasi hasil scan -->
+    <div class="offcanvas offcanvas-bottom sheet" tabindex="-1" id="confirmSheet" data-bs-backdrop="static">
+        <div class="grabber"></div>
+        <div class="offcanvas-body pt-3 pb-4">
+            <div id="sheetMessage" class="alert mb-3" style="display:none;"></div>
+
+            <div id="sheetTruck">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="step-pill" id="stepPill"></span>
+                    <small class="text-muted" id="stageTime"></small>
+                </div>
+                <div class="container-no" id="sheetContainer"></div>
+                <div class="text-muted mb-3"><i class="fas fa-truck me-1"></i> <b id="sheetPlate"></b> &middot; #<span id="sheetQueue"></span></div>
+                <div class="info-grid mb-3">
+                    <div><small>Principal</small><b id="sheetPrincipal"></b></div>
+                    <div><small>Size</small><b id="sheetSize"></b></div>
+                    <div style="grid-column: span 2;"><small>Customer</small><b id="sheetCustomer"></b></div>
+                </div>
+
+                <!-- Pilih Depo & Blok (hanya langkah 2) -->
+                <div id="zonePicker" style="display:none;">
+                    <div class="fw-bold small text-secondary mb-2">PILIH DEPO &amp; BLOK PENEMPATAN</div>
+                    <div class="depo-tabs mb-2" id="depoTabs"></div>
+                    <div class="block-grid mb-3" id="blockGrid"></div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-light fw-bold btn-confirm" style="flex: 0 0 34%;" id="btnSheetCancel">Batal</button>
+                <button type="button" class="btn btn-success btn-confirm flex-fill" id="btnSheetConfirm"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daftar pending -->
+    <div class="offcanvas offcanvas-bottom sheet" tabindex="-1" id="pendingSheet">
+        <div class="grabber"></div>
+        <div class="offcanvas-body pt-3">
+            <div class="fw-bold small text-secondary mb-1"><i class="fas fa-hourglass-half me-1"></i> MENUNGGU MASUK SURVEY</div>
+            <div id="pendingWaitingList" class="mb-3"></div>
+            <div class="fw-bold small text-secondary mb-1"><i class="fas fa-search me-1"></i> SEDANG SURVEY (BELUM SELESAI)</div>
+            <div id="pendingSurveyList"></div>
+        </div>
+    </div>
+
+    <!-- Kilat sukses -->
+    <div class="flash" id="flash"><i class="fas fa-check-circle"></i><div class="h4 fw-bold mb-1" id="flashTitle"></div><div id="flashText"></div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const CSRF_NAME = "<?= $this->security->get_csrf_token_name(); ?>";
         let CSRF_HASH = "<?= $this->security->get_csrf_hash(); ?>";
+        const STAGE_KPI = <?= (int) MY_Controller::STAGE_KPI_MINUTES; ?>;
+
+        // Blok penempatan dikelompokkan per depo
+        const ZONES = {};
+        <?php foreach ($zones as $zone): ?>
+        (ZONES[<?= json_encode($zone->depo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>] = ZONES[<?= json_encode($zone->depo, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>] || []).push(<?= json_encode($zone->zone_code, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>);
+        <?php endforeach; ?>
+
+        function esc(value) {
+            return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
+        }
 
         // Token di halaman bisa basi: ambil token baru lalu ulangi request sekali
         function refreshCsrf(done) {
@@ -147,180 +219,313 @@
                 .fail(function() { done(false); });
         }
 
-        function esc(value) {
-            return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
+        function postJson(url, data, onSuccess, onFail, retried) {
+            data[CSRF_NAME] = CSRF_HASH;
+            $.ajax({ url: url, type: "POST", data: data, dataType: "json" })
+                .done(onSuccess)
+                .fail(function(xhr) {
+                    if (xhr.status === 403 && !retried) {
+                        refreshCsrf(function(ok) { ok ? postJson(url, data, onSuccess, onFail, true) : onFail(xhr); });
+                        return;
+                    }
+                    if (xhr.status === 401) {
+                        window.location.reload();
+                        return;
+                    }
+                    onFail(xhr);
+                });
         }
 
-        function renderPendingList(rows, listId, countId) {
-            $(countId).text(rows.length + ' Truk');
-            if (!rows.length) {
-                $(listId).html('<div class="text-center py-2 text-muted small">Tidak ada antrean.</div>');
+        function feedback(success) {
+            try { if (navigator.vibrate) navigator.vibrate(success ? [80] : [100, 60, 100]); } catch (e) {}
+            try {
+                let ctx = new (window.AudioContext || window.webkitAudioContext)();
+                let osc = ctx.createOscillator();
+                let gain = ctx.createGain();
+                osc.frequency.value = success ? 880 : 300;
+                gain.gain.value = 0.12;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        /* ===================== KAMERA ===================== */
+        let scanner = null;
+        let cameras = [];
+        let cameraIndex = -1;
+        let torchOn = false;
+        let busy = false;
+        let lastDone = { code: '', time: 0 };
+
+        function camStatus(text) { $('#camStatus').text(text); }
+
+        function showCamOff(title, text) {
+            $('#cam').addClass('off');
+            $('#camOffTitle').text(title);
+            $('#camOffText').text(text);
+            $('#btnTorch, #btnSwitch').hide();
+        }
+
+        function startCamera() {
+            if (typeof Html5Qrcode === 'undefined') {
+                showCamOff('Pemindai gagal dimuat', 'Periksa koneksi internet, lalu muat ulang halaman. Input manual tetap bisa dipakai.');
                 return;
             }
-            let html = '';
-            rows.forEach(function(r) {
-                html += '<div class="recent-item">' +
-                    '<div><div class="fw-bold text-dark mb-0">' + esc(r.container_no || r.queue_number) + '</div>' +
-                    '<small class="text-muted" style="font-size: 11px;">' + esc(r.license_plate) + ' &middot; #' + esc(r.queue_number) + '</small></div>' +
-                    '<span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span>' +
-                '</div>';
+            if (!window.isSecureContext || !navigator.mediaDevices) {
+                showCamOff('Kamera tidak tersedia', 'Kamera hanya bisa dipakai lewat HTTPS. Gunakan input manual.');
+                return;
+            }
+            if (!scanner) {
+                scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
+            }
+            let source = cameraIndex >= 0 && cameras[cameraIndex] ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: 'environment' };
+
+            $('#cam').removeClass('off');
+            camStatus('Menyalakan kamera...');
+            scanner.start(source, { fps: 12, aspectRatio: 1.0 }, onDecoded, function() {})
+                .then(function() {
+                    camStatus('Arahkan kamera ke QR di HP supir');
+                    setupCameraTools();
+                })
+                .catch(function(err) {
+                    let denied = String(err).toLowerCase().indexOf('permission') !== -1 || String(err).indexOf('NotAllowed') !== -1;
+                    showCamOff(denied ? 'Izin kamera ditolak' : 'Kamera tidak bisa dibuka',
+                        denied ? 'Izinkan akses kamera di pengaturan browser, lalu ketuk Aktifkan Kamera.' : 'Tutup aplikasi lain yang memakai kamera, lalu coba lagi.');
+                });
+        }
+
+        function setupCameraTools() {
+            torchOn = false;
+            $('#btnTorch').removeClass('active');
+            try {
+                let caps = scanner.getRunningTrackCapabilities();
+                $('#btnTorch').toggle(!!(caps && caps.torch));
+            } catch (e) { $('#btnTorch').hide(); }
+
+            Html5Qrcode.getCameras().then(function(list) {
+                cameras = list || [];
+                $('#btnSwitch').toggle(cameras.length > 1);
+            }).catch(function() { $('#btnSwitch').hide(); });
+        }
+
+        $('#btnStartCam').on('click', startCamera);
+
+        $('#btnTorch').on('click', function() {
+            torchOn = !torchOn;
+            scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] })
+                .then(function() { $('#btnTorch').toggleClass('active', torchOn); })
+                .catch(function() { torchOn = !torchOn; });
+        });
+
+        $('#btnSwitch').on('click', function() {
+            if (!cameras.length) return;
+            cameraIndex = (cameraIndex + 1) % cameras.length;
+            scanner.stop().then(startCamera).catch(startCamera);
+        });
+
+        function pauseCamera() {
+            $('#cam').addClass('paused');
+            try { if (scanner && scanner.getState && scanner.getState() === Html5QrcodeScannerState.SCANNING) scanner.pause(true); } catch (e) {}
+        }
+
+        function resumeCamera() {
+            $('#cam').removeClass('paused detected');
+            camStatus('Arahkan kamera ke QR di HP supir');
+            try { if (scanner && scanner.getState && scanner.getState() === Html5QrcodeScannerState.PAUSED) scanner.resume(); } catch (e) {}
+        }
+
+        function onDecoded(text) {
+            if (busy) return;
+            let match = String(text).toUpperCase().match(/A-\d{8}-\d{3}/);
+            let code = match ? match[0] : String(text).trim().toUpperCase();
+            // QR yang baru diproses masih di depan kamera: abaikan beberapa detik
+            if (code === lastDone.code && Date.now() - lastDone.time < 6000) return;
+            $('#cam').addClass('detected');
+            lookupQueue(code);
+        }
+
+        /* ===================== KONFIRMASI ===================== */
+        const sheet = new bootstrap.Offcanvas(document.getElementById('confirmSheet'));
+        let current = null;
+        let selectedZone = '';
+
+        function sheetMessage(type, text) {
+            $('#sheetMessage').removeClass('alert-danger alert-warning alert-success').addClass('alert-' + type)
+                .html(esc(text).replace(/\n/g, '<br>')).toggle(!!text);
+        }
+
+        function lookupQueue(code) {
+            busy = true;
+            pauseCamera();
+            camStatus('Membaca data truk...');
+            feedback(true);
+            postJson("<?= base_url('yardman/lookup'); ?>", { queue_number: code }, function(res) {
+                current = res.status === 'success' ? res : null;
+                current && (current.code = code);
+                renderSheet(res);
+                sheet.show();
+            }, function() {
+                renderSheet({ status: 'error', message: 'Gagal terhubung ke server. Coba scan ulang.' });
+                sheet.show();
             });
-            $(listId).html(html);
+        }
+
+        function renderSheet(res) {
+            selectedZone = '';
+            if (res.status !== 'success') {
+                feedback(false);
+                $('#sheetTruck').hide();
+                sheetMessage(res.status === 'warning' ? 'warning' : 'danger', res.message);
+                $('#btnSheetConfirm').text('Scan Berikutnya').removeClass('btn-success btn-primary').addClass('btn-dark').prop('disabled', false).data('action', 'close');
+                return;
+            }
+
+            let q = res.queue;
+            sheetMessage('', '');
+            $('#sheetTruck').show();
+            $('#sheetContainer').text(q.container_no || '-');
+            $('#sheetPlate').text(q.license_plate);
+            $('#sheetQueue').text(q.queue_number);
+            $('#sheetPrincipal').text(q.principal || '-');
+            $('#sheetSize').text(q.container_size || '-');
+            $('#sheetCustomer').text(q.customer || '-');
+            $('#stageTime').html('<i class="fas fa-stopwatch me-1"></i>' + esc(q.stage_minutes) + ' mnt di tahap ini')
+                .toggleClass('text-danger fw-bold', q.stage_minutes > STAGE_KPI)
+                .toggleClass('text-muted', q.stage_minutes <= STAGE_KPI);
+
+            if (res.step === 1) {
+                $('#stepPill').attr('class', 'step-pill step-1').html('<i class="fas fa-sign-in-alt"></i> LANGKAH 1 &middot; MASUK SURVEY');
+                $('#zonePicker').hide();
+                $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> MULAI SURVEY').removeClass('btn-dark btn-success').addClass('btn-primary').prop('disabled', false).data('action', 'confirm');
+            } else {
+                $('#stepPill').attr('class', 'step-pill step-2').html('<i class="fas fa-flag-checkered"></i> LANGKAH 2 &middot; SURVEY SELESAI');
+                renderZonePicker();
+                $('#zonePicker').toggle(Object.keys(ZONES).length > 0);
+                $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> SELESAI SURVEY').removeClass('btn-dark btn-primary').addClass('btn-success')
+                    .prop('disabled', Object.keys(ZONES).length > 0).data('action', 'confirm');
+            }
+        }
+
+        function renderZonePicker(activeDepo) {
+            let depos = Object.keys(ZONES);
+            activeDepo = activeDepo || depos[0];
+            $('#depoTabs').html(depos.map(function(d) {
+                return '<button type="button" data-depo="' + esc(d) + '" class="' + (d === activeDepo ? 'active' : '') + '">' + esc(d) + '</button>';
+            }).join(''));
+            $('#blockGrid').html((ZONES[activeDepo] || []).map(function(z) {
+                return '<button type="button" data-zone="' + esc(z) + '" class="' + (z === selectedZone ? 'active' : '') + '">' + esc(z) + '</button>';
+            }).join(''));
+        }
+
+        $('#depoTabs').on('click', 'button', function() { renderZonePicker($(this).data('depo')); });
+        $('#blockGrid').on('click', 'button', function() {
+            selectedZone = $(this).data('zone');
+            $('#blockGrid button').removeClass('active');
+            $(this).addClass('active');
+            $('#btnSheetConfirm').prop('disabled', false).html('<i class="fas fa-check me-1"></i> SELESAI SURVEY &middot; BLOK ' + esc(selectedZone));
+        });
+
+        $('#btnSheetCancel').on('click', function() { sheet.hide(); });
+        document.getElementById('confirmSheet').addEventListener('hidden.bs.offcanvas', function() {
+            busy = false;
+            current = null;
+            resumeCamera();
+        });
+
+        $('#btnSheetConfirm').on('click', function() {
+            if ($(this).data('action') !== 'confirm' || !current) {
+                sheet.hide();
+                return;
+            }
+            let btn = $(this).prop('disabled', true);
+            let code = current.queue.queue_number;
+            postJson("<?= base_url('yardman/process_scan'); ?>", { queue_number: code, zone_code: selectedZone }, function(res) {
+                if (res.status !== 'success') {
+                    feedback(false);
+                    btn.prop('disabled', false);
+                    sheetMessage(res.status === 'warning' ? 'warning' : 'danger', res.message);
+                    return;
+                }
+                lastDone = { code: code, time: Date.now() };
+                showFlash(res.message);
+                addRecentScan(code, current ? current.queue.container_no : '', res.message);
+                loadPending();
+                sheet.hide();
+            }, function() {
+                btn.prop('disabled', false);
+                sheetMessage('danger', 'Gagal terhubung ke server. Coba lagi.');
+            });
+        });
+
+        function showFlash(message) {
+            let lines = String(message).split('\n');
+            $('#flashTitle').text(lines[0]);
+            $('#flashText').html(esc(lines.slice(1).join('\n')).replace(/\n/g, '<br>'));
+            $('#flash').addClass('show');
+            feedback(true);
+            setTimeout(function() { $('#flash').removeClass('show'); }, 1600);
+        }
+
+        /* ===================== INPUT MANUAL ===================== */
+        $('#btnManualSubmit').on('click', function() {
+            let code = $('#manualQueueInput').val().trim().toUpperCase();
+            if (code === '' || busy) return;
+            $('#manualQueueInput').val('').blur();
+            lookupQueue(code);
+        });
+        $('#manualQueueInput').on('keypress', function(e) { if (e.which === 13) $('#btnManualSubmit').click(); });
+
+        /* ===================== RIWAYAT & PENDING ===================== */
+        let recentCount = 0;
+        function addRecentScan(code, container, msg) {
+            $('#emptyRecentText').remove();
+            recentCount++;
+            $('#recentCount').text(recentCount + ' scan');
+            let now = new Date();
+            let time = (now.getHours() < 10 ? '0' : '') + now.getHours() + ':' + (now.getMinutes() < 10 ? '0' : '') + now.getMinutes();
+            let done = /SURVEY SELESAI/.test(msg);
+            $('#recentScanList').prepend(
+                '<div class="recent-item"><div>' +
+                    '<div class="fw-bold">' + esc(container || code) + '</div>' +
+                    '<small class="text-muted">' + esc(code) + ' &middot; ' + esc(String(msg).split('\n')[0]) + '</small>' +
+                '</div><span class="badge ' + (done ? 'bg-success' : 'bg-primary') + '">' + time + '</span></div>'
+            );
+            $('#recentScanList .recent-item').slice(6).remove();
+        }
+
+        function renderPendingList(rows, listId) {
+            if (!rows.length) {
+                $(listId).html('<div class="text-muted small py-2">Tidak ada truk.</div>');
+                return;
+            }
+            $(listId).html(rows.map(function(r) {
+                return '<div class="pending-item"><div>' +
+                    '<div class="fw-bold">' + esc(r.container_no || r.queue_number) + '</div>' +
+                    '<small class="text-muted">' + esc(r.license_plate) + ' &middot; #' + esc(r.queue_number) + '</small></div>' +
+                    '<span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span></div>';
+            }).join(''));
         }
 
         function loadPending() {
-            $.ajax({
-                url: "<?= base_url('yardman/pending_json'); ?>",
-                data: { _: Date.now() },
-                dataType: "json",
-                success: function(res) {
-                    renderPendingList(res.waiting_survey || [], '#pendingWaitingList', '#pendingWaitingCount');
-                    renderPendingList(res.in_survey || [], '#pendingSurveyList', '#pendingSurveyCount');
-                }
-            });
+            $.ajax({ url: "<?= base_url('yardman/pending_json'); ?>", data: { _: Date.now() }, dataType: "json" })
+                .done(function(res) {
+                    let waiting = res.waiting_survey || [], survey = res.in_survey || [];
+                    $('#countWaiting').text(waiting.length);
+                    $('#countSurvey').text(survey.length);
+                    $('#chipWaiting').toggleClass('late', waiting.some(function(r) { return r.overdue; }));
+                    $('#chipSurvey').toggleClass('late', survey.some(function(r) { return r.overdue; }));
+                    renderPendingList(waiting, '#pendingWaitingList');
+                    renderPendingList(survey, '#pendingSurveyList');
+                })
+                .fail(function(xhr) { if (xhr.status === 401) window.location.reload(); });
         }
         loadPending();
         setInterval(loadPending, 5000);
 
-        let isProcessing = false;
-        let lastScanCode = '';
-        let lastScanTime = 0;
-        let html5QrCode = null;
-
-        // Inisialisasi Audio Beep Bawaan Browser (Web Audio API)
-        function playBeepSound() {
-            try {
-                let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                let osc = audioCtx.createOscillator();
-                let gain = audioCtx.createGain();
-                osc.type = "sine";
-                osc.frequency.value = 880; // Nada Beep tinggi (880Hz)
-                gain.gain.value = 0.1;
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                setTimeout(() => { osc.stop(); audioCtx.close(); }, 150);
-            } catch(e) {}
-        }
-
-        function triggerVibration() {
-            if ("vibrate" in navigator) {
-                navigator.vibrate([100, 50, 100]); // Getar 2x
-            }
-        }
-
-        function sendScanData(queueNumber, retried) {
-            if (isProcessing) return;
-
-            // Abaikan QR yang sama selama 10 detik (kamera terus membaca QR yang masih di dalam bingkai)
-            let nowMs = Date.now();
-            if (!retried && queueNumber === lastScanCode && nowMs - lastScanTime < 10000) return;
-            lastScanCode = queueNumber;
-            lastScanTime = nowMs;
-
-            isProcessing = true;
-
-            playBeepSound();
-            triggerVibration();
-
-            $('#scanStatusBadge').removeClass('bg-success-subtle text-success').addClass('bg-warning-subtle text-warning').text('Memproses...');
-
-            $.ajax({
-                url: "<?= base_url('yardman/process_scan'); ?>",
-                type: "POST",
-                data: { queue_number: queueNumber, zone_code: $('#zoneSelect').val() || '', [CSRF_NAME]: CSRF_HASH },
-                dataType: "json",
-                success: function(res) {
-                    let alertClass = res.status === 'success' ? 'alert-success text-success' : (res.status === 'warning' ? 'alert-warning text-dark' : 'alert-danger text-danger');
-                    let icon = res.status === 'success' ? 'check-circle' : 'exclamation-circle';
-                    
-                    $('#scanResult')
-                        .removeClass('alert-success alert-warning alert-danger text-success text-dark text-danger')
-                        .addClass(alertClass)
-                        .html('<i class="fas fa-' + icon + ' me-2"></i><b>' + esc(res.message).replace(/\n/g, "<br>") + '</b>')
-                        .fadeIn();
-
-                    if (res.status === 'success') {
-                        let match = queueNumber.match(/A-\d{8}-\d{3}/);
-                        addRecentScan(match ? match[0] : queueNumber, res.message);
-                        loadPending();
-                        // Blok sudah dipakai untuk survey selesai: reset agar tidak terbawa ke truk berikutnya
-                        if (/SURVEY SELESAI/.test(res.message)) $('#zoneSelect').val('');
-                    }
-
-                    // Error (misal blok yard belum dipilih) boleh langsung discan ulang
-                    if (res.status === 'error') {
-                        lastScanCode = '';
-                    }
-
-                    setTimeout(function() {
-                        isProcessing = false;
-                        $('#scanStatusBadge').removeClass('bg-warning-subtle text-warning').addClass('bg-success-subtle text-success').text('Kamera Aktif');
-                    }, 3500);
-                },
-                error: function(xhr) {
-                    if (xhr.status === 403 && !retried) {
-                        isProcessing = false;
-                        refreshCsrf(function(ok) { if (ok) sendScanData(queueNumber, true); });
-                        return;
-                    }
-                    if (xhr.status === 401 || xhr.status === 403) {
-                        window.location.reload();
-                        return;
-                    }
-                    lastScanCode = '';
-                    $('#scanResult')
-                        .removeClass('alert-success alert-warning text-success text-dark')
-                        .addClass('alert-danger text-danger')
-                        .text('Gagal terhubung ke server. Scan ulang barcode.')
-                        .fadeIn();
-                    isProcessing = false;
-                    $('#scanStatusBadge').removeClass('bg-warning-subtle text-warning').addClass('bg-success-subtle text-success').text('Kamera Aktif');
-                }
-            });
-        }
-
-        function addRecentScan(code, msg) {
-            $('#emptyRecentText').hide();
-            let now = new Date();
-            let timeStr = (now.getHours()<10?'0':'') + now.getHours() + ':' + (now.getMinutes()<10?'0':'') + now.getMinutes();
-
-            let itemHtml = `
-                <div class="recent-item">
-                    <div>
-                        <div class="fw-bold text-dark mb-0">${esc(code)}</div>
-                        <small class="text-muted" style="font-size: 11px;">${esc(msg.split('\n')[0])}</small>
-                    </div>
-                    <span class="badge bg-light text-dark border">${timeStr}</span>
-                </div>
-            `;
-            $('#recentScanList').prepend(itemHtml);
-            
-            // Batasi 4 baris riwayat terakhir
-            if ($('#recentScanList .recent-item').length > 4) {
-                $('#recentScanList .recent-item:last').remove();
-            }
-        }
-
-        $('#btnManualSubmit').click(function() {
-            let qNum = $('#manualQueueInput').val().trim();
-            if (qNum !== '') {
-                sendScanData(qNum);
-                $('#manualQueueInput').val('');
-            }
-        });
-
-        $('#manualQueueInput').keypress(function(e) {
-            if (e.which === 13) {
-                $('#btnManualSubmit').click();
-            }
-        });
-
-        // Initialize Html5Qrcode Scanner Engine
-        let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 15, qrbox: 240 });
-        html5QrcodeScanner.render(function(decodedText) {
-            sendScanData(decodedText);
-        });
+        // Kamera langsung menyala saat halaman dibuka (jika izin sudah pernah diberikan)
+        startCamera();
     </script>
 </body>
-</html>
+</html>

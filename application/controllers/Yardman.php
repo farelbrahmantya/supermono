@@ -29,28 +29,44 @@ class Yardman extends MY_Controller {
     //   scan 1: IN_YARD   -> IN_SURVEY (truk masuk area survey)
     //   scan 2: IN_SURVEY -> AT_YARD   (survey selesai, blok penempatan wajib dipilih)
     // Gate In & Gate Out hanya boleh dilakukan Security di halaman Gate.
-    public function process_scan() {
-        $queue_number = $this->_extract_queue_number($this->input->post('queue_number'));
-        $zone_code    = strtoupper(trim((string) $this->input->post('zone_code')));
-        $user_id      = $this->session->userdata('user_id');
 
-        $queue = $this->db->get_where('queue_transactions', array('queue_number' => $queue_number))->row();
-
-        if (!$queue) {
-            $this->_json(array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue_number . ' tidak ditemukan!'));
+    // Baca data truk dari QR tanpa mengubah status, untuk layar konfirmasi Yardman
+    public function lookup() {
+        $queue = $this->_find_queue($this->input->post('queue_number'));
+        $check = $this->_check_step($queue);
+        if (isset($check['status'])) {
+            $this->_json($check);
             return;
         }
 
-        if ($queue->status == 'WAITING_GATE') {
-            $this->_json(array(
-                'status'  => 'warning',
-                'message' => "Truk {$queue->license_plate} BELUM Gate In.\nTruk wajib discan Security di Gate In terlebih dahulu."
-            ));
+        $this->_json(array(
+            'status' => 'success',
+            'step'   => $check['step'],
+            'queue'  => array(
+                'queue_number'   => $queue->queue_number,
+                'license_plate'  => $queue->license_plate,
+                'container_no'   => $queue->container_no,
+                'principal'      => $queue->principal,
+                'container_size' => $queue->container_size,
+                'customer'       => $queue->customer,
+                'stage_minutes'  => (int) floor((time() - strtotime($check['step'] === 1 ? $queue->gate_in_at : $queue->survey_start_at)) / 60)
+            )
+        ));
+    }
+
+    public function process_scan() {
+        $queue     = $this->_find_queue($this->input->post('queue_number'));
+        $zone_code = strtoupper(trim((string) $this->input->post('zone_code')));
+        $user_id   = $this->session->userdata('user_id');
+
+        $check = $this->_check_step($queue);
+        if (isset($check['status'])) {
+            $this->_json($check);
             return;
         }
 
         // SCAN 1: truk masuk area survey
-        if ($queue->status == 'IN_YARD') {
+        if ($check['step'] === 1) {
             $updated = $this->_transition($queue->id, 'IN_YARD', array(
                 'status'          => 'IN_SURVEY',
                 'survey_start_at' => $this->_now(),
@@ -59,22 +75,6 @@ class Yardman extends MY_Controller {
             $this->_json($updated
                 ? array('status' => 'success', 'message' => "MASUK AREA SURVEY!\nContainer {$queue->container_no} ({$queue->license_plate}).\nScan lagi setelah survey selesai.")
                 : array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
-            return;
-        }
-
-        if ($queue->status == 'AT_YARD') {
-            $this->_json(array(
-                'status'  => 'warning',
-                'message' => "Survey antrean {$queue->queue_number} sudah selesai pada {$queue->yard_scan_at}.\nSelanjutnya scan di Gate Out."
-            ));
-            return;
-        }
-
-        if ($queue->status != 'IN_SURVEY') {
-            $this->_json(array(
-                'status'  => 'warning',
-                'message' => "Antrean {$queue->queue_number} sudah berstatus {$queue->status}."
-            ));
             return;
         }
 
@@ -87,7 +87,7 @@ class Yardman extends MY_Controller {
                 return;
             }
         } elseif ($this->db->count_all('yard_zones') > 0) {
-            $this->_json(array('status' => 'error', 'message' => 'Survey selesai: pilih Depo & Blok penempatan terlebih dahulu, lalu scan ulang!'));
+            $this->_json(array('status' => 'error', 'message' => 'Survey selesai: pilih Depo & Blok penempatan terlebih dahulu!'));
             return;
         }
 
@@ -110,5 +110,31 @@ class Yardman extends MY_Controller {
             'status'  => 'success',
             'message' => "SURVEY SELESAI!\nContainer {$queue->container_no} ({$queue->license_plate}).{$zone_text}"
         ));
+    }
+
+    private function _find_queue($input) {
+        $queue_number = $this->_extract_queue_number($input);
+        $queue = $this->db->get_where('queue_transactions', array('queue_number' => $queue_number))->row();
+        return $queue ? $queue : $queue_number;
+    }
+
+    // Langkah Yardman untuk antrean ini (step 1 / 2), atau respon peringatan jika tidak bisa diproses
+    private function _check_step($queue) {
+        if (!is_object($queue)) {
+            return array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue . ' tidak ditemukan!');
+        }
+        if ($queue->status == 'WAITING_GATE') {
+            return array('status' => 'warning', 'message' => "Truk {$queue->license_plate} BELUM Gate In.\nTruk wajib discan Security di Gate In terlebih dahulu.");
+        }
+        if ($queue->status == 'IN_YARD') {
+            return array('step' => 1);
+        }
+        if ($queue->status == 'IN_SURVEY') {
+            return array('step' => 2);
+        }
+        if ($queue->status == 'AT_YARD') {
+            return array('status' => 'warning', 'message' => "Survey antrean {$queue->queue_number} sudah selesai pada {$queue->yard_scan_at}.\nSelanjutnya scan di Gate Out.");
+        }
+        return array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah berstatus {$queue->status}.");
     }
 }
