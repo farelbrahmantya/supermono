@@ -229,4 +229,150 @@ class MY_Controller extends CI_Controller {
         $rate = $this->_minutes_per_gate_in();
         return $rate === NULL ? NULL : (int) round(($position - 1) * $rate);
     }
+
+    // Kunci link Layar TV (role DISPLAY, tanpa login): diturunkan dari encryption key & password DB
+    // sehingga tidak perlu disimpan; ganti encryption key untuk mencabut link lama
+    protected function _display_key() {
+        return substr(hash_hmac('sha256', 'lasmono-display-tv', config_item('encryption_key') . '|' . $this->db->password . '|' . $this->db->database), 0, 24);
+    }
+
+    protected function _get_kpi_metrics() {
+        $cutoff = $this->_expiry_cutoff();
+
+        // Truk Antre di Luar (yang belum kedaluwarsa)
+        $truck_waiting = $this->db->where('status', 'WAITING_GATE')
+                                  ->where('created_at >=', $cutoff)
+                                  ->count_all_results('queue_transactions');
+
+        // Antrean kedaluwarsa (tidak pernah Gate In)
+        $truck_expired = $this->db->where('status', 'WAITING_GATE')
+                                  ->where('created_at <', $cutoff)
+                                  ->count_all_results('queue_transactions');
+
+        // Truk di dalam depo (sudah Gate In, belum Gate Out)
+        $truck_in_yard = $this->db->where_in('status', $this->in_depo_statuses)
+                                  ->count_all_results('queue_transactions');
+
+        // Rata-rata TAT (Menit) truk yang Gate Out hari ini:
+        // total = daftar antrean -> gate out, wait = daftar -> gate in, service = gate in -> gate out
+        $query_tat = $this->db->query("
+            SELECT AVG(TIMESTAMPDIFF(MINUTE, created_at, gate_out_at)) AS avg_total,
+                   AVG(TIMESTAMPDIFF(MINUTE, created_at, gate_in_at))  AS avg_wait,
+                   AVG(TIMESTAMPDIFF(MINUTE, gate_in_at, gate_out_at)) AS avg_service,
+                   COUNT(*) AS completed
+            FROM queue_transactions
+            WHERE status = 'COMPLETED' AND gate_out_at >= ?
+        ", array(date('Y-m-d 00:00:00')))->row();
+
+        // Throughput Gate In 1 jam terakhir
+        $gate_in_last_hour = $this->db->where('gate_in_at >=', date('Y-m-d H:i:s', time() - 3600))
+                                      ->count_all_results('queue_transactions');
+
+        return array(
+            'avg_tat'           => (int) round((float) $query_tat->avg_total),
+            'avg_wait'          => (int) round((float) $query_tat->avg_wait),
+            'avg_service'       => (int) round((float) $query_tat->avg_service),
+            'completed_today'   => (int) $query_tat->completed,
+            'truck_waiting'     => $truck_waiting,
+            'truck_expired'     => $truck_expired,
+            'truck_in_yard'     => $truck_in_yard,
+            'gate_in_last_hour' => $gate_in_last_hour
+        );
+    }
+
+    protected function _get_active_queues() {
+        $now  = $this->_now();
+        $rows = $this->db->query("
+            SELECT q.id, q.queue_number, q.license_plate, q.container_no, q.status, q.activity, q.driver_activity, q.sla_target_minutes, z.zone_code, z.depo,
+            CASE WHEN q.status = 'WAITING_GATE'
+                 THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
+                 ELSE TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
+            END AS elapsed_minutes,
+            CASE q.status
+                 WHEN 'WAITING_GATE' THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
+                 WHEN 'IN_YARD'      THEN TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
+                 WHEN 'IN_SURVEY'    THEN TIMESTAMPDIFF(MINUTE, q.survey_start_at, ?)
+                 ELSE TIMESTAMPDIFF(MINUTE, q.yard_scan_at, ?)
+            END AS stage_minutes
+            FROM queue_transactions q
+            LEFT JOIN yard_zones z ON z.id = q.current_zone_id
+            WHERE q.status IN ('IN_YARD', 'IN_SURVEY', 'AT_YARD')
+               OR (q.status = 'WAITING_GATE' AND q.created_at >= ?)
+            ORDER BY q.id ASC
+        ", array($now, $now, $now, $now, $now, $now, $this->_expiry_cutoff()))->result();
+
+        $rate     = $this->_minutes_per_gate_in();
+        $position = 0;
+        $queues   = array();
+
+        foreach ($rows as $q) {
+            $elapsed       = max(0, (int) $q->elapsed_minutes);
+            $stage_minutes = max(0, (int) $q->stage_minutes);
+            $over_sla = $q->status !== 'WAITING_GATE' && $elapsed > (int) $q->sla_target_minutes;
+            $estimated_call = NULL;
+
+            if ($q->status === 'WAITING_GATE') {
+                $position++;
+                $label = 'Menunggu Gate';
+                $badge = 'badge-waiting';
+                if ($rate !== NULL) {
+                    $estimated_call = (int) round(($position - 1) * $rate);
+                }
+            } elseif ($q->status === 'IN_YARD' && $q->activity === 'D') {
+                $label = 'Gate In - Pilih Container (Yardman)';
+                $badge = 'badge-yard';
+            } elseif ($q->status === 'IN_YARD' && $q->activity === 'E') {
+                $label = 'Gate In - Menuju Muat (Yardman)';
+                $badge = 'badge-yard';
+            } elseif ($q->status === 'IN_YARD') {
+                $label = 'Gate In - Menuju Survey';
+                $badge = 'badge-yard';
+            } elseif ($q->status === 'IN_SURVEY') {
+                $label = 'Sedang Survey';
+                $badge = 'badge-yard';
+            } else {
+                $label = ($this->_is_muat($q->activity) ? 'Sudah Muat - ' : '') . 'Menunggu Gate Out' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
+                $badge = 'badge-yard';
+            }
+
+            if ($over_sla) {
+                $label = 'Over SLA - ' . $label;
+                $badge = 'badge-over-sla';
+            }
+
+            $stage = $this->_current_stage($q);
+            $queues[] = array(
+                'queue_number'    => $q->queue_number,
+                'activity'        => $q->activity,
+                // Pilihan supir saat daftar (sebelum kitir di-scan di Gate In)
+                'driver_activity' => $q->driver_activity,
+                'zone'            => $q->zone_code ? $q->depo . ' Blok ' . $q->zone_code : NULL,
+                'activity_label'  => $this->_activity_label($q->activity),
+                'license_plate'   => $q->license_plate,
+                'container_no'    => $q->container_no,
+                'status_label'    => $label,
+                'badge_class'     => $badge,
+                'elapsed_minutes' => $elapsed,
+                // Total sejak Gate In dibanding target SLA aktivitas
+                'sla_target'      => $q->status === 'WAITING_GATE' ? NULL : (int) $q->sla_target_minutes,
+                'sla_level'       => $q->status === 'WAITING_GATE' ? NULL : $this->_sla_level($elapsed, (int) $q->sla_target_minutes),
+                'estimated_call'  => $estimated_call,
+                // Tahap yang sedang ditunggu & lama menunggu di tahap itu (KPI per tahap di dalam depo)
+                'stage'           => $stage ? $stage[0] : 'antre',
+                'stage_target'    => $stage ? $stage[3] : NULL,
+                'stage_minutes'   => $stage_minutes,
+                'stage_overdue'   => $stage !== NULL && $stage_minutes > $stage[3],
+                'stage_level'     => $stage === NULL ? NULL : $this->_sla_level($stage_minutes, $stage[3])
+            );
+        }
+
+        return $queues;
+    }
+
+    // Tingkat SLA: ok (< 80% target), warning (>= 80%), over (melebihi target)
+    protected function _sla_level($minutes, $target) {
+        if ($minutes > $target) return 'over';
+        if ($minutes >= $target * 0.8) return 'warning';
+        return 'ok';
+    }
 }

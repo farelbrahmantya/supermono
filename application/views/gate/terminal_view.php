@@ -141,7 +141,8 @@
                             <tr><td class="text-muted">Nopol di Kitir</td><td class="fw-semibold" id="kitirNopol"></td></tr>
                         </table>
                         <label class="form-label small fw-bold text-muted mb-1">TRUK YANG GATE IN (urut FIFO)</label>
-                        <select id="kitirQueueSelect" class="form-select fw-bold mb-3"></select>
+                        <select id="kitirQueueSelect" class="form-select fw-bold mb-2"></select>
+                        <div class="alert alert-warning small py-2 mb-3" id="kitirActivityNote" style="display:none;"></div>
                         <button type="button" class="btn btn-success w-100 fw-bold py-2" id="kitirConfirm">
                             <i class="fas fa-check me-1"></i> KONFIRMASI GATE IN
                         </button>
@@ -274,7 +275,7 @@
             let html = '';
             rows.forEach(function(r) {
                 html += '<tr data-queue="' + esc(r.queue_number) + '" style="cursor: pointer;">' +
-                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + (showZone ? ' <span class="act-tag act-' + esc(r.activity) + '">' + esc(r.activity_label) + '</span>' : '') + '</td>' +
+                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + ' <span class="act-tag act-' + esc(r.activity) + '">' + esc(r.activity_label) + '</span>' + '</td>' +
                     '<td>' + esc(r.license_plate) + '</td>' +
                     (showZone ? '<td>' + esc(r.zone_code || '-') + '</td>' : '') +
                     '<td><span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span></td>' +
@@ -308,6 +309,7 @@
 
         const IS_GATE_IN = <?= in_array($role, array('GATE_IN', 'CONTROL_TOWER')) ? 'true' : 'false'; ?>;
         let currentKitir = null;
+        let currentCandidates = [];
 
         // Deteksi Otomatis saat Barcode Scanner menekan tombol Enter
         $('#gateBarcodeInput').keypress(function(e) {
@@ -395,6 +397,7 @@
                     return;
                 }
                 currentKitir = res.kitir;
+                currentCandidates = res.candidates;
                 $('#kitirBarcode').text('(' + res.kitir.barcode + ')');
                 $('#kitirActivity').html('<span class="act-tag act-' + esc(res.kitir.activity) + '">' + esc(res.kitir.activity_label) + '</span>');
                 if (res.kitir.container_no) {
@@ -410,13 +413,25 @@
                 let options = '';
                 res.candidates.forEach(function(c, i) {
                     options += '<option value="' + esc(c.queue_number) + '"' + (c.queue_number === res.suggested ? ' selected' : '') + '>' +
-                        (i + 1) + '. ' + esc(c.license_plate) + ' - #' + esc(c.queue_number) + ' (' + esc(c.waiting_minutes) + ' mnt)</option>';
+                        (i + 1) + '. ' + esc(c.license_plate) + ' - #' + esc(c.queue_number) + ' - ' + esc(c.activity_label) + ' (' + esc(c.waiting_minutes) + ' mnt)</option>';
                 });
                 $('#kitirQueueSelect').html(options);
+                checkActivityNote();
                 $('#kitirPanel').show();
                 $('#gateBarcodeInput').focus();
             });
         }
+
+        // Catatan jika kegiatan yang dipilih supir berbeda dengan kitir (kitir tetap acuan)
+        function checkActivityNote() {
+            if (!currentKitir) return;
+            let q = (currentCandidates || []).filter(function(c) { return c.queue_number === $('#kitirQueueSelect').val(); })[0];
+            let differ = q && q.activity !== currentKitir.activity;
+            $('#kitirActivityNote').toggle(!!differ).html(differ
+                ? '<i class="fas fa-circle-info me-1"></i> Supir memilih <b>' + esc(q.activity_label) + '</b>, kitir <b>' + esc(currentKitir.activity_label) + '</b>. Gate In tetap mengikuti kitir.'
+                : '');
+        }
+        $('#kitirQueueSelect').on('change', checkActivityNote);
 
         $('#kitirCancel').on('click', closeKitir);
 
@@ -437,7 +452,7 @@
 
         // Klik truk di daftar pending untuk memilihnya di panel kitir
         $(document).on('click', '#pendingGateInBody tr[data-queue]', function() {
-            if (currentKitir) $('#kitirQueueSelect').val($(this).data('queue'));
+            if (currentKitir) $('#kitirQueueSelect').val($(this).data('queue')).trigger('change');
         });
 
         function addRecentRow(code, msg) {

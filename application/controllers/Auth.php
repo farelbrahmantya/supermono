@@ -62,6 +62,7 @@ class Auth extends MY_Controller {
     public function process_login_driver() {
         $phone = $this->_normalize_phone($this->input->post('driver_phone'));
         $plate = $this->_normalize_plate($this->input->post('license_plate'));
+        $activity = strtoupper((string) $this->input->post('activity'));
 
         if ($phone === FALSE || $plate === FALSE) {
             $this->session->set_flashdata('error_driver', 'Format Nomor HP (contoh: 08123456789) atau Nopol (contoh: B 9123 UQK) tidak valid!');
@@ -103,8 +104,13 @@ class Auth extends MY_Controller {
             return;
         }
 
-        // 2. JIKA BELUM ADA ANTREAN AKTIF: Buatkan Nomor Antrean Baru
-        $queue_num = $this->_create_queue($phone, $plate);
+        // 2. JIKA BELUM ADA ANTREAN AKTIF: Buatkan Nomor Antrean Baru (aktivitas wajib dipilih)
+        if (!isset($this->activities[$activity])) {
+            $this->session->set_flashdata('error_driver', 'Pilih jenis kegiatan terlebih dahulu (Repo In, Import, Export, atau Repo Out).');
+            redirect('auth');
+            return;
+        }
+        $queue_num = $this->_create_queue($phone, $plate, $activity);
         if ($queue_num === FALSE) {
             $this->session->set_flashdata('error_driver', 'Gagal membuat antrean, silakan coba lagi.');
             redirect('auth');
@@ -141,7 +147,7 @@ class Auth extends MY_Controller {
     }
 
     // Insert antrean baru; dicoba ulang jika insert gagal
-    private function _create_queue($phone, $plate) {
+    private function _create_queue($phone, $plate, $activity) {
         $prefix = 'A-' . date('Ymd') . '-';
         $db_debug = $this->db->db_debug;
         $this->db->db_debug = FALSE;
@@ -161,7 +167,10 @@ class Auth extends MY_Controller {
                 'driver_phone'       => $phone,
                 'license_plate'      => $plate,
                 'status'             => 'WAITING_GATE',
-                'sla_target_minutes' => 15,
+                // Pilihan supir; saat Gate In diganti sesuai huruf kitir (kitir yang menjadi acuan)
+                'activity'           => $activity,
+                'driver_activity'    => $activity,
+                'sla_target_minutes' => $this->_total_target($activity),
                 'created_at'         => $this->_now()
             ));
 

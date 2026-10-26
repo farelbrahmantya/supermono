@@ -51,7 +51,14 @@ class Gate extends MY_Controller {
         }
 
         // Saran truk: nopol di kitir (jika ada) yang cocok, selain itu antrean paling awal (FIFO)
+        // dengan kegiatan yang sama seperti pilihan supir, selain itu antrean paling awal
         $suggested = $candidates[0]['queue_number'];
+        foreach ($candidates as $c) {
+            if ($c['activity'] === $kitir->activity) {
+                $suggested = $c['queue_number'];
+                break;
+            }
+        }
         $kitir_plate = str_replace(' ', '', strtoupper((string) $kitir->nopol));
         foreach ($candidates as $c) {
             if ($kitir_plate !== '' && str_replace(' ', '', $c['license_plate']) === $kitir_plate) {

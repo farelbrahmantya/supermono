@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   `current_zone_id` int(11) DEFAULT NULL,
   `cp_id` bigint(20) DEFAULT NULL,
   `activity` char(1) NOT NULL DEFAULT 'Z',
+  `driver_activity` char(1) DEFAULT NULL,
   `container_no` varchar(15) DEFAULT NULL,
   `principal` varchar(20) DEFAULT NULL,
   `container_size` varchar(30) DEFAULT NULL,

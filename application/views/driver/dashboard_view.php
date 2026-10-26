@@ -128,6 +128,8 @@
                 <div class="queue-no mb-2">#<?= html_escape($queue->queue_number); ?></div>
                 <div class="meta-row">
                     <span id="positionBadge" class="lx-pill lx-pill-blue" <?= $queue_position === NULL ? 'style="display:none;"' : ''; ?>><i class="fas fa-list-ol"></i><span>Urutan ke-<span id="queuePosition"><?= $queue_position; ?></span></span></span>
+                    <?php $act_labels = array('Z' => 'Repo In', 'A' => 'Import', 'D' => 'Export', 'E' => 'Repo Out'); ?>
+                    <span class="act-tag act-<?= html_escape($queue->activity); ?>" style="font-size: 12px; padding: 5px 10px; border-radius: 50px;"><?= html_escape(isset($act_labels[$queue->activity]) ? $act_labels[$queue->activity] : $queue->activity); ?></span>
                     <span id="statusBadge" class="lx-pill <?= $queue->status === 'WAITING_GATE' ? 'lx-pill-amber' : 'lx-pill-green'; ?>">
                         <i class="fas fa-circle" style="font-size: 7px;"></i> <?= html_escape(isset($status_labels[$queue->status]) ? $status_labels[$queue->status] : $queue->status); ?>
                     </span>

@@ -35,6 +35,15 @@
         .principal-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #3b3f47; }
         .principal-legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
 
+        /* Tab & filter aktivitas */
+        .ct-tabs { gap: 6px; border-bottom: 1px solid var(--lx-border); }
+        .ct-tabs .nav-link { color: var(--lx-muted); font-weight: 700; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 10px 14px; }
+        .ct-tabs .nav-link.active { color: var(--lx-text); border-bottom-color: var(--lx-primary); background: transparent; }
+        .activity-filter button { border: 1px solid var(--lx-border); background: #fff; border-radius: 50px; padding: 5px 14px; font-size: 13px; font-weight: 600; color: #4b5059; margin-right: 4px; }
+        .activity-filter button.active { background: var(--lx-ink); border-color: var(--lx-ink); color: #fff; }
+        .yard-wrap { max-width: 760px; }
+        .btn-tv { background: var(--lx-grad); color: var(--lx-ink); border: none; }
+
         /* Tabel antrean */
         .table-custom { margin: 0; }
         .table-custom th { background: #f8f7f3; color: var(--lx-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid var(--lx-border); white-space: nowrap; }
@@ -85,6 +94,7 @@
             <button id="sosButton" class="btn btn-danger fw-bold" data-bs-toggle="modal" data-bs-target="#sosModal">
                 <i class="fas fa-bell me-1"></i> SOS <span class="badge bg-white text-danger ms-1" id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>
             </button>
+            <a href="<?= html_escape($tv_url); ?>" target="_blank" rel="noopener" class="btn btn-tv fw-bold" title="Buka di browser TV, tanpa login"><i class="fas fa-tv me-1"></i> Layar TV</a>
             <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-clock-rotate-left me-1"></i> Riwayat</a>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
             <span class="lx-user">
@@ -146,10 +156,14 @@
             </div>
         </div>
 
-        <!-- KPI per Tahap hari ini: proses mana yang tidak mencapai target -->
-        <div class="section-label">KPI per tahap hari ini <small>(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, pilih container Export <?= MY_Controller::EXPORT_PICK_KPI_MINUTES; ?> menit, truk yang sudah Gate Out)</small></div>
-        <div class="row g-3 mb-4" id="stageKpiCards"></div>
-
+        <!-- Tab: ringkas per kebutuhan (Live untuk operasional, KPI & Yard untuk evaluasi) -->
+        <ul class="nav ct-tabs mb-3" id="ctTabs" role="tablist">
+            <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabLive" type="button"><i class="fas fa-satellite-dish me-1"></i> Live Antrean</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabKpi" type="button"><i class="fas fa-gauge-high me-1"></i> KPI Tahap</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabYard" type="button"><i class="fas fa-border-all me-1"></i> Kepadatan Yard</button></li>
+        </ul>
+        <div class="tab-content pb-4">
+        <div class="tab-pane fade show active" id="tabLive" role="tabpanel">
         <!-- Pending per Tahap: klik untuk menyaring tabel Live Antrean -->
         <div class="section-label">Pending per tahap <small>(klik untuk melihat detail)</small></div>
         <div class="row g-3 mb-4" id="stageCards">
@@ -214,58 +228,70 @@
                 </div>
             </div>
         </div>
+        <div class="activity-filter mb-3" id="activityFilter">
+            <span class="small text-muted fw-semibold me-1">Aktivitas:</span>
+            <button type="button" class="active" data-act="">Semua</button>
+            <button type="button" data-act="Z">Repo In</button>
+            <button type="button" data-act="A">Import</button>
+            <button type="button" data-act="D">Export</button>
+            <button type="button" data-act="E">Repo Out</button>
+        </div>
+        <div class="card-section">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold mb-0">Live Antrean (SLA Monitor)</h5>
+                <span class="sla-legend d-none d-md-inline">Time vs target:<i class="sla-ok"></i>On track<i class="sla-warning"></i>&ge; 80%<i class="sla-over"></i>Over SLA</span>
+                <span id="stageFilterBadge" class="badge bg-primary rounded-pill px-3 py-2" role="button" style="display:none;"></span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-custom border-0">
+                    <thead>
+                        <tr>
+                            <th>Queue No.</th>
+                            <th>License Plate</th>
+                            <th>Container</th>
+                            <th>Status</th>
+                            <th title="Time in the current stage / stage target">Stage Time</th>
+                            <th title="Total time since Gate In / SLA target (queue time before Gate In)">Elapsed Time</th>
+                            <th>Estimated Call</th>
+                        </tr>
+                    </thead>
+                    <tbody id="queueTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        </div>
 
-        <!-- Main Content -->
-        <div class="row g-4">
-            <!-- Live Antrean (SLA Monitor) -->
-            <div class="col-lg-8">
-                <div class="card-section">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="fw-bold mb-0">Live Antrean (SLA Monitor)</h5>
-                        <span class="sla-legend d-none d-md-inline">Time vs target:<i class="sla-ok"></i>On track<i class="sla-warning"></i>&ge; 80%<i class="sla-over"></i>Over SLA</span>
-                        <span id="stageFilterBadge" class="badge bg-primary rounded-pill px-3 py-2" role="button" style="display:none;"></span>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-custom border-0">
-                            <thead>
-                                <tr>
-                                    <th>Queue No.</th>
-                                    <th>License Plate</th>
-                                    <th>Container</th>
-                                    <th>Status</th>
-                                    <th title="Time in the current stage / stage target">Stage Time</th>
-                                    <th title="Total time since Gate In / SLA target (queue time before Gate In)">Elapsed Time</th>
-                                    <th>Estimated Call</th>
-                                </tr>
-                            </thead>
-                            <tbody id="queueTableBody">
-                            </tbody>
-                        </table>
-                    </div>
+        <div class="tab-pane fade" id="tabKpi" role="tabpanel">
+        <!-- KPI per Tahap hari ini: proses mana yang tidak mencapai target -->
+        <div class="section-label">KPI per tahap hari ini <small>(target <?= MY_Controller::STAGE_KPI_MINUTES; ?> menit per tahap, pilih container Export <?= MY_Controller::EXPORT_PICK_KPI_MINUTES; ?> menit, truk yang sudah Gate Out)</small></div>
+        <div class="row g-3 mb-4" id="stageKpiCards"></div>
+
+        <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-outline-secondary btn-sm"><i class="fas fa-clock-rotate-left me-1"></i> Lihat riwayat &amp; export Excel</a>
+        </div>
+
+        <div class="tab-pane fade" id="tabYard" role="tabpanel">
+        <div class="yard-wrap">
+        <div class="card-section">
+            <h5 class="fw-bold mb-1">Kepadatan Yard</h5>
+            <div class="small text-muted mb-3">Traffic truk per blok &middot; angka = truk menuju / di blok</div>
+            <div id="heatmapGrid"></div>
+            <?php if (empty($heatmap)): ?>
+                <small class="text-muted d-block">Belum ada data blok yard (tabel yard_zones kosong).</small>
+            <?php endif; ?>
+            <div class="mt-3 pt-3 border-top">
+                <small class="fw-bold text-muted d-block mb-2">Principal (warna garis kiri blok)</small>
+                <div class="principal-legend d-flex flex-wrap gap-3 mb-3" id="principalLegend"></div>
+                <small class="fw-bold text-muted d-block mb-2">Traffic truk di jalan akses blok</small>
+                <div class="d-flex flex-wrap align-items-center gap-3 small text-muted">
+                    <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #a7f3d0;"></span> Lancar (&lt; <?= Control_tower::TRAFFIC_MEDIUM; ?> truk)</span>
+                    <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #fcd34d;"></span> Ramai (<?= Control_tower::TRAFFIC_MEDIUM; ?>&ndash;<?= Control_tower::TRAFFIC_HIGH - 1; ?>)</span>
+                    <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #f87171;"></span> Padat (&ge; <?= Control_tower::TRAFFIC_HIGH; ?>)</span>
                 </div>
             </div>
-
-            <!-- Kepadatan Yard (Heatmap Matrix) -->
-            <div class="col-lg-4">
-                <div class="card-section">
-                    <h5 class="fw-bold mb-1">Kepadatan Yard</h5>
-                    <div class="small text-muted mb-3">Traffic truk per blok &middot; angka = truk menuju / di blok</div>
-                    <div id="heatmapGrid"></div>
-                    <?php if (empty($heatmap)): ?>
-                        <small class="text-muted d-block">Belum ada data blok yard (tabel yard_zones kosong).</small>
-                    <?php endif; ?>
-                    <div class="mt-3 pt-3 border-top">
-                        <small class="fw-bold text-muted d-block mb-2">Principal (warna garis kiri blok)</small>
-                        <div class="principal-legend d-flex flex-wrap gap-3 mb-3" id="principalLegend"></div>
-                        <small class="fw-bold text-muted d-block mb-2">Traffic truk di jalan akses blok</small>
-                        <div class="d-flex flex-wrap align-items-center gap-3 small text-muted">
-                            <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #a7f3d0;"></span> Lancar (&lt; <?= Control_tower::TRAFFIC_MEDIUM; ?> truk)</span>
-                            <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #fcd34d;"></span> Ramai (<?= Control_tower::TRAFFIC_MEDIUM; ?>&ndash;<?= Control_tower::TRAFFIC_HIGH - 1; ?>)</span>
-                            <span class="d-flex align-items-center"><span class="rounded me-1" style="width: 12px; height: 12px; background: #f87171;"></span> Padat (&ge; <?= Control_tower::TRAFFIC_HIGH; ?>)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        </div>
+        </div>
+        </div>
         </div>
     </div>
 
@@ -400,8 +426,10 @@
             });
         }
 
+        let activeAct = '';
         function renderQueues(queues) {
             lastQueues = queues;
+            if (activeAct) queues = queues.filter(function(q) { return q.activity === activeAct; });
             renderStageCards(queues);
 
             let rows = activeStage ? queues.filter(function(q) { return cardStage(q) === activeStage; }) : queues;
@@ -447,6 +475,20 @@
         $('.stage-card').on('click', function() { setStageFilter($(this).data('stage')); });
         $('.stage-card').on('keydown', function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStageFilter($(this).data('stage')); } });
         $('#stageFilterBadge').on('click', function() { setStageFilter(activeStage); });
+        $('#activityFilter').on('click', 'button', function() {
+            activeAct = $(this).data('act');
+            $('#activityFilter button').removeClass('active');
+            $(this).addClass('active');
+            renderQueues(lastQueues);
+        });
+        // Ingat tab terakhir di browser ini
+        try {
+            let savedTab = localStorage.getItem('lasmonoCtTab');
+            if (savedTab && document.querySelector('#ctTabs [data-bs-target="' + savedTab + '"]')) {
+                bootstrap.Tab.getOrCreateInstance(document.querySelector('#ctTabs [data-bs-target="' + savedTab + '"]')).show();
+            }
+        } catch (e) {}
+        $('#ctTabs button').on('shown.bs.tab', function() { try { localStorage.setItem('lasmonoCtTab', $(this).data('bs-target')); } catch (e) {} });
 
         renderQueues(<?= json_encode($queues, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>);
 

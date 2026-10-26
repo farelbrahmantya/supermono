@@ -33,6 +33,21 @@
         .stack { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 28px; }
         .stack i { display: block; width: 64px; border-radius: 6px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.18) 0 2px, transparent 2px 8px); border: 1px solid rgba(255,255,255,.18); }
 
+        /* Pilihan kegiatan supir: wajib dipilih, tanpa pilihan bawaan */
+        .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .act-grid input { position: absolute; opacity: 0; pointer-events: none; }
+        .act-grid label { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 2px solid var(--lx-border); border-radius: 14px; background: #fff; cursor: pointer; transition: .15s; line-height: 1.15; }
+        .act-grid label .ic { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
+        .act-grid label b { display: block; font-size: 14px; }
+        .act-grid label small { color: #8a8f99; font-size: 11px; }
+        .act-grid label .check { position: absolute; top: 6px; right: 8px; color: var(--lx-success); display: none; }
+        .act-grid input:checked + label { border-color: var(--lx-primary); background: #fffaf0; box-shadow: 0 0 0 3px rgba(229, 167, 32, .18); }
+        .act-grid input:checked + label .check { display: block; }
+        .act-grid input:focus-visible + label { outline: 2px solid var(--lx-primary); }
+        .act-grid.invalid label { border-color: #f3b3b5; }
+        .act-error { display: none; color: var(--lx-red); font-size: 12px; font-weight: 600; margin-top: 6px; }
+        .act-grid.invalid + .act-error { display: block; }
+
         /* Panel form */
         .panel { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
         .form-card { width: 100%; max-width: 420px; }
@@ -151,8 +166,30 @@
                                     <input type="text" name="license_plate" class="form-control text-uppercase" placeholder="B 9123 UQK" autocomplete="off" required>
                                 </div>
                             </div>
-                            <p class="hint mb-4"><i class="fas fa-circle-info me-1"></i> Gunakan nomor HP & nopol yang sama selama antrean berlangsung.</p>
-                            <button type="submit" class="btn btn-primary btn-go w-100">
+                            <p class="hint mb-3"><i class="fas fa-circle-info me-1"></i> Gunakan nomor HP & nopol yang sama selama antrean berlangsung.</p>
+                            <div class="mb-4">
+                                <label class="form-label">JENIS KEGIATAN <span class="fw-normal text-muted">(sesuai kitir)</span></label>
+                                <div class="act-grid" id="actGrid">
+                                    <?php
+                                        $driver_acts = array(
+                                            'Z' => array('Repo In', 'Kontainer kosong masuk', 'fa-arrow-right-to-bracket', '#fff3d1', '#8a5a00'),
+                                            'A' => array('Import', 'Bongkar kontainer', 'fa-box-open', '#dcfce7', '#047857'),
+                                            'D' => array('Export', 'Muat kontainer ekspor', 'fa-ship', '#e0ecff', '#1d4ed8'),
+                                            'E' => array('Repo Out', 'Kontainer kosong keluar', 'fa-arrow-right-from-bracket', '#f3e8ff', '#7e22ce')
+                                        );
+                                    ?>
+                                    <?php foreach ($driver_acts as $code => $act): ?>
+                                        <input type="radio" name="activity" value="<?= $code; ?>" id="act<?= $code; ?>">
+                                        <label for="act<?= $code; ?>">
+                                            <span class="ic" style="background: <?= $act[3]; ?>; color: <?= $act[4]; ?>;"><i class="fas <?= $act[2]; ?>"></i></span>
+                                            <span><b><?= $act[0]; ?></b><small><?= $act[1]; ?></small></span>
+                                            <i class="fas fa-circle-check check"></i>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="act-error"><i class="fas fa-circle-exclamation me-1"></i>Pilih jenis kegiatan terlebih dahulu.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-go w-100" id="driverSubmit">
                                 Masuk Antrean <i class="fas fa-arrow-right ms-1"></i>
                             </button>
                         </form>
@@ -206,6 +243,28 @@
             input.type = show ? 'text' : 'password';
             this.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
         });
+
+        // Kegiatan supir: tombol masuk menyebut kegiatan yang dipilih agar salah pilih mudah terlihat
+        (function() {
+            var grid = document.getElementById('actGrid');
+            if (!grid) return;
+            var radios = grid.querySelectorAll('input[name="activity"]');
+            for (var i = 0; i < radios.length; i++) {
+                radios[i].addEventListener('change', function() {
+                    grid.classList.remove('invalid');
+                    var name = grid.querySelector('label[for="' + this.id + '"] b').textContent;
+                    document.getElementById('driverSubmit').innerHTML = 'Masuk Antrean &middot; ' + name + ' <i class="fas fa-arrow-right ms-1"></i>';
+                });
+            }
+            grid.closest('form').addEventListener('submit', function(e) {
+                if (!grid.querySelector('input[name="activity"]:checked')) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    grid.classList.add('invalid');
+                    grid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        })();
 
         // Ambil token CSRF terbaru tepat sebelum form dikirim
         (function() {
