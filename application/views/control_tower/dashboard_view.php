@@ -247,6 +247,7 @@
                     <thead>
                         <tr>
                             <th>Queue No.</th>
+                            <th>Activity</th>
                             <th>License Plate</th>
                             <th>Container</th>
                             <th>Status</th>
@@ -445,7 +446,8 @@
             rows.forEach(function(q) {
                 let worst = (q.stage_level === 'over' || q.sla_level === 'over') ? 'over' : ((q.stage_level === 'warning' || q.sla_level === 'warning') ? 'warning' : '');
                 html += '<tr class="' + (worst ? 'row-' + worst : '') + '">' +
-                    '<td class="fw-bold">' + esc(q.queue_number) + '<br><span class="act-tag act-' + esc(q.activity) + '">' + esc(q.activity_label) + '</span></td>' +
+                    '<td class="fw-bold">' + esc(q.queue_number) + '</td>' +
+                    '<td><span class="act-tag act-' + esc(q.activity) + '">' + esc(q.activity_label) + '</span></td>' +
                     '<td class="fw-semibold">' + esc(q.license_plate) + '</td>' +
                     '<td>' + esc(q.container_no || '-') + '</td>' +
                     '<td><span class="badge badge-pill-status ' + esc(q.badge_class) + '">' + esc(q.status_label) + '</span></td>' +
@@ -455,7 +457,7 @@
                 '</tr>';
             });
             if (!rows.length) {
-                html = '<tr><td colspan="7" class="text-center text-muted py-4">' + (activeStage ? 'Tidak ada antrean pending di tahap ini.' : 'Tidak ada antrean aktif.') + '</td></tr>';
+                html = '<tr><td colspan="8" class="text-center text-muted py-4">' + (activeStage ? 'Tidak ada antrean pending di tahap ini.' : 'Tidak ada antrean aktif.') + '</td></tr>';
             }
             $('#queueTableBody').html(html);
         }

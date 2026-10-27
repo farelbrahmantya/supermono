@@ -216,6 +216,7 @@
                                 <thead>
                                     <tr>
                                         <th>No. Antrean</th>
+                                        <th>Aktivitas</th>
                                         <th>Nopol</th>
                                         <th>Menunggu</th>
                                     </tr>
@@ -240,6 +241,7 @@
                                 <thead>
                                     <tr>
                                         <th>No. Antrean</th>
+                                        <th>Aktivitas</th>
                                         <th>Nopol</th>
                                         <th>Blok</th>
                                         <th>Menunggu</th>
@@ -280,13 +282,14 @@
             if (!body.length) return;
             $('#pending' + key + 'Count').text(rows.length + ' Truk');
             if (!rows.length) {
-                body.html('<tr><td colspan="' + (showZone ? 4 : 3) + '" class="text-center text-muted py-3">Tidak ada antrean pending.</td></tr>');
+                body.html('<tr><td colspan="' + (showZone ? 5 : 4) + '" class="text-center text-muted py-3">Tidak ada antrean pending.</td></tr>');
                 return;
             }
             let html = '';
             rows.forEach(function(r) {
                 html += '<tr data-queue="' + esc(r.queue_number) + '" style="cursor: pointer;">' +
-                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + ' <span class="act-tag act-' + esc(r.activity) + '">' + esc(r.activity_label) + '</span>' + '</td>' +
+                    '<td class="fw-bold text-primary">' + esc(r.queue_number) + '</td>' +
+                    '<td><span class="act-tag act-' + esc(r.activity) + '">' + esc(r.activity_label) + '</span></td>' +
                     '<td>' + esc(r.license_plate) + '</td>' +
                     (showZone ? '<td>' + esc(r.zone_code || '-') + '</td>' : '') +
                     '<td><span class="badge ' + (r.overdue ? 'bg-danger' : 'bg-light text-dark border') + '">' + esc(r.waiting_minutes) + ' mnt</span></td>' +
