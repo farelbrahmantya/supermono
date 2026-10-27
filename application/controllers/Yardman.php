@@ -235,7 +235,7 @@ class Yardman extends MY_Controller {
                                        ->where_in('status', $this->in_depo_statuses)
                                        ->order_by('id', 'DESC')
                                        ->get('queue_transactions', 1)->row() : NULL;
-            return $queue ? $queue : 'kitir ' . strtoupper(trim((string) $input)) . ' (belum Gate In)';
+            return $queue ? $queue : array('status' => 'warning', 'message' => 'Kitir ' . strtoupper(trim((string) $input)) . " belum Gate In.\nTruk wajib discan Security di Gate In terlebih dahulu.");
         }
 
         $queue_number = $this->_extract_queue_number($input);
@@ -245,6 +245,9 @@ class Yardman extends MY_Controller {
 
     // Langkah Yardman untuk antrean ini (step 1 / 2), atau respon peringatan jika tidak bisa diproses
     private function _check_step($queue) {
+        if (is_array($queue)) {
+            return $queue;
+        }
         if (!is_object($queue)) {
             return array('status' => 'error', 'message' => 'Nomor Antrean ' . $queue . ' tidak ditemukan!');
         }

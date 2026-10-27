@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <?php $this->load->view('partials/theme'); ?>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
+    <!-- Pembaca QR & barcode (ZXing). Video kamera ditampilkan sendiri agar aman di Safari iPhone -->
+    <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js" type="text/javascript"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         :root { --ink: #1c1d21; --ink-2: #26282e; --blue: #e5a720; --green: #10b981; --amber: #f59e0b; --red: #ef4444; }
@@ -30,13 +31,10 @@
         .stat-chip.late { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red); }
 
         .cam { --ar: 3 / 4; position: relative; width: 100%; max-width: 100%; aspect-ratio: var(--ar); margin: 0 auto; border-radius: 20px; overflow: hidden; background: #000; }
-        #reader { position: absolute; inset: 0; border: none !important; }
-        #reader > div { display: none !important; } /* label "Scanner paused" bawaan library */
-        #reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
-        #reader img, #reader canvas, #qr-shaded-region { display: none !important; }
+        #camVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
 
-        /* Bingkai pindai: area luar digelapkan, sudut bingkai, garis pindai */
-        .cam-frame { position: absolute; top: 50%; left: 50%; width: 68%; aspect-ratio: 1 / 1; transform: translate(-50%, -50%); border-radius: 18px; box-shadow: 0 0 0 999px rgba(5, 10, 20, .55); pointer-events: none; }
+        /* Bingkai pindai: sudut bingkai & garis pindai (tanpa efek blur/bayangan besar di atas video: membuat video hitam di iPhone) */
+        .cam-frame { position: absolute; top: 50%; left: 50%; width: 68%; height: 0; padding-bottom: 68%; transform: translate(-50%, -50%); pointer-events: none; }
         .cam-frame i { position: absolute; width: 34px; height: 34px; border: 4px solid #fff; }
         .cam-frame i:nth-child(1) { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-top-left-radius: 18px; }
         .cam-frame i:nth-child(2) { top: -2px; right: -2px; border-left: 0; border-bottom: 0; border-top-right-radius: 18px; }
@@ -47,9 +45,9 @@
         .cam.detected .cam-frame i { border-color: var(--green); }
         .cam.paused .cam-frame .scanline { display: none; }
 
-        .cam-status { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(15, 23, 42, .75); backdrop-filter: blur(6px); color: #fff; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 50px; white-space: nowrap; }
+        .cam-status { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(15, 23, 42, .78); color: #fff; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 50px; white-space: nowrap; }
         .cam-tools { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; }
-        .cam-tools .icon-btn { background: rgba(15, 23, 42, .6); backdrop-filter: blur(6px); }
+        .cam-tools .icon-btn { background: rgba(15, 23, 42, .7); }
         .cam-tools .icon-btn.active { background: var(--amber); color: #111; border-color: var(--amber); }
         .cam-off { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #cbd5e1; padding: 24px; background: radial-gradient(circle at center, #1e293b, #000); }
         .cam.off .cam-off { display: flex; }
@@ -125,7 +123,7 @@
 
             <!-- Kamera -->
             <div class="cam off" id="cam">
-                <div id="reader"></div>
+                <video id="camVideo" playsinline webkit-playsinline muted autoplay></video>
                 <div class="cam-frame"><i></i><i></i><i></i><i></i><div class="scanline"></div></div>
                 <div class="cam-tools">
                     <button type="button" class="icon-btn" id="btnTorch" title="Flash" style="display:none;"><i class="fas fa-bolt"></i></button>
@@ -280,131 +278,168 @@
         }
 
         /* ===================== KAMERA ===================== */
-        let scanner = null;
+        const video = document.getElementById('camVideo');
+        let stream = null;
         let cameras = [];
         let cameraIndex = -1;
         let torchOn = false;
         let busy = false;
+        let scanning = false;
+        let scanTimer = null;
+        let frameNo = 0;
+        let reader = null, canvas = null, ctx = null;
         let lastDone = { code: '', time: 0 };
 
         function camStatus(text) { $('#camStatus').text(text); }
 
         function showCamOff(title, text) {
+            stopStream();
             $('#cam').addClass('off');
             $('#camOffTitle').text(title);
             $('#camOffText').text(text);
             $('#btnTorch, #btnSwitch').hide();
         }
 
-        // Mode kamera: 0 = kamera belakang 1280x720, 1 = kamera belakang tanpa syarat resolusi (cadangan iPhone)
-        let simpleMode = 0;
-        let watchdog = null;
+        // Pembaca ZXing: QR supir + barcode garis kitir (Code 128 / Code 39)
+        function initReader() {
+            if (reader) return true;
+            if (typeof ZXing === 'undefined') return false;
+            let hints = new Map();
+            hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE, ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39]);
+            hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+            reader = new ZXing.MultiFormatReader();
+            reader.setHints(hints);
+            canvas = document.createElement('canvas');
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+            return true;
+        }
+
+        function stopStream() {
+            scanning = false;
+            clearTimeout(scanTimer);
+            if (stream) {
+                stream.getTracks().forEach(function(t) { t.stop(); });
+                stream = null;
+            }
+        }
 
         function startCamera() {
-            if (typeof Html5Qrcode === 'undefined') {
+            if (!initReader()) {
                 showCamOff('Pemindai gagal dimuat', 'Periksa koneksi internet, lalu muat ulang halaman. Input manual tetap bisa dipakai.');
                 return;
             }
-            if (!window.isSecureContext || !navigator.mediaDevices) {
+            if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 showCamOff('Kamera tidak tersedia', 'Kamera hanya bisa dipakai lewat HTTPS. Gunakan input manual.');
                 return;
             }
-            if (!scanner) {
-                // QR supir + barcode garis di kertas kitir
-                scanner = new Html5Qrcode('reader', { verbose: false, formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39] });
-            }
-            // Kamera dipilih manual lewat tombol ganti kamera; bawaan = kamera belakang utama dari browser
-            let useDevice = cameraIndex >= 0 && cameras[cameraIndex];
-            let source = useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: 'environment' };
-            let config = { fps: 10 };
-            if (simpleMode === 0) {
-                config.videoConstraints = $.extend({}, useDevice ? { deviceId: { exact: cameras[cameraIndex].id } } : { facingMode: { ideal: 'environment' } },
-                    { width: { ideal: 1280 }, height: { ideal: 720 } });
-            }
-
+            stopStream();
             $('#cam').removeClass('off');
             camStatus('Menyalakan kamera...');
-            scanner.start(source, config, onDecoded, function() {})
-                .then(function() {
-                    camStatus('Arahkan kamera ke QR di HP supir');
-                    ensureVideoPlaying();
-                    fitCameraBox();
-                    setupCameraTools();
-                })
-                .catch(function(err) {
-                    let text = String(err);
-                    let denied = text.toLowerCase().indexOf('permission') !== -1 || text.indexOf('NotAllowed') !== -1;
-                    // Resolusi tidak didukung: coba lagi tanpa syarat resolusi
-                    if (!denied && simpleMode === 0) {
-                        simpleMode = 1;
-                        startCamera();
-                        return;
+
+            // Dicoba berurutan: kamera belakang 720p, kamera belakang tanpa syarat, kamera apa saja
+            let deviceId = cameraIndex >= 0 && cameras[cameraIndex] ? cameras[cameraIndex].deviceId : null;
+            let base = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } };
+            let attempts = [
+                { audio: false, video: $.extend({ width: { ideal: 1280 }, height: { ideal: 720 } }, base) },
+                { audio: false, video: base },
+                { audio: false, video: true }
+            ];
+            (function tryOpen(i) {
+                navigator.mediaDevices.getUserMedia(attempts[i]).then(onStream).catch(function(err) {
+                    let name = err && err.name ? err.name : String(err);
+                    if (name === 'NotAllowedError' || name === 'SecurityError') {
+                        showCamOff('Izin kamera ditolak', 'Izinkan akses kamera di pengaturan browser, lalu ketuk Aktifkan Kamera.');
+                    } else if (i + 1 < attempts.length) {
+                        tryOpen(i + 1);
+                    } else {
+                        showCamOff('Kamera tidak bisa dibuka', 'Tutup aplikasi lain yang memakai kamera, lalu coba lagi.');
                     }
-                    showCamOff(denied ? 'Izin kamera ditolak' : 'Kamera tidak bisa dibuka',
-                        denied ? 'Izinkan akses kamera di pengaturan browser, lalu ketuk Aktifkan Kamera.' : 'Tutup aplikasi lain yang memakai kamera, lalu coba lagi.');
                 });
+            })(0);
         }
 
-        // Safari iPhone: video wajib inline + muted dan diputar manual, jika tidak gambar tetap hitam
-        function ensureVideoPlaying() {
-            let video = document.querySelector('#reader video');
-            if (!video) return;
+        function onStream(s) {
+            stream = s;
+            // Safari iPhone: video harus inline + muted sebelum diputar
             video.setAttribute('playsinline', '');
             video.setAttribute('webkit-playsinline', '');
-            video.setAttribute('autoplay', '');
             video.muted = true;
-            try { let p = video.play(); if (p && p.catch) p.catch(function() {}); } catch (e) {}
+            video.srcObject = s;
+            playVideo();
+            video.onloadedmetadata = function() { fitCameraBox(); playVideo(); };
+            camStatus('Arahkan kamera ke QR di HP supir');
+            setupCameraTools();
+            scanning = true;
+            scanLoop();
+        }
 
-            // Jika 3 detik gambar belum bergerak, nyalakan ulang kamera dengan mode cadangan
-            clearTimeout(watchdog);
-            let startTime = video.currentTime;
-            watchdog = setTimeout(function() {
-                let v = document.querySelector('#reader video');
-                let frozen = !v || v.readyState < 2 || !v.videoWidth || v.currentTime === startTime;
-                if (frozen && simpleMode === 0 && !$('#cam').hasClass('paused')) {
-                    simpleMode = 1;
-                    camStatus('Menyesuaikan kamera...');
-                    scanner.stop().then(startCamera).catch(startCamera);
+        function playVideo() {
+            try {
+                let p = video.play();
+                if (p && p.catch) p.catch(function() { camStatus('Ketuk gambar kamera untuk memulai'); });
+            } catch (e) {}
+        }
+
+        // Ambil gambar dari video lalu baca: bergantian area tengah (QR) dan pita horizontal (barcode kitir)
+        function scanLoop() {
+            clearTimeout(scanTimer);
+            if (!scanning) return;
+            if (!busy && video.readyState >= 2 && video.videoWidth) {
+                let vw = video.videoWidth, vh = video.videoHeight, sx, sy, sw, sh;
+                if (frameNo++ % 2 === 0) {
+                    sw = sh = Math.min(vw, vh) * 0.75;
+                } else {
+                    sw = vw * 0.9;
+                    sh = Math.min(vh, sw * 0.45);
                 }
-            }, 3000);
+                sx = (vw - sw) / 2;
+                sy = (vh - sh) / 2;
+                let scale = Math.min(1, 720 / sw);
+                canvas.width = Math.round(sw * scale);
+                canvas.height = Math.round(sh * scale);
+                ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+                try {
+                    let bitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(canvas)));
+                    onDecoded(reader.decodeWithState(bitmap).getText());
+                } catch (e) {}
+            }
+            scanTimer = setTimeout(scanLoop, 120);
         }
 
         function setupCameraTools() {
             torchOn = false;
             $('#btnTorch').removeClass('active');
-            try {
-                let caps = scanner.getRunningTrackCapabilities();
-                $('#btnTorch').toggle(!!(caps && caps.torch));
-            } catch (e) { $('#btnTorch').hide(); }
+            let track = stream ? stream.getVideoTracks()[0] : null;
+            let caps = {};
+            try { caps = track && track.getCapabilities ? track.getCapabilities() : {}; } catch (e) {}
+            $('#btnTorch').toggle(!!caps.torch);
 
-            Html5Qrcode.getCameras().then(function(list) {
-                cameras = list || [];
+            navigator.mediaDevices.enumerateDevices().then(function(list) {
+                cameras = list.filter(function(d) { return d.kind === 'videoinput'; });
                 $('#btnSwitch').toggle(cameras.length > 1);
             }).catch(function() { $('#btnSwitch').hide(); });
         }
 
         // Kotak kamera mengikuti rasio video asli agar gambar tidak terpotong
         function fitCameraBox() {
-            let video = document.querySelector('#reader video');
-            if (!video) return;
-            let apply = function() {
-                if (video.videoWidth && video.videoHeight) {
-                    // Lebar dibatasi agar tinggi kotak maksimal 62% layar
-                    let ratio = video.videoWidth / video.videoHeight;
-                    let width = Math.min($('#cam').parent().width(), window.innerHeight * 0.62 * ratio);
-                    $('#cam').css({ '--ar': video.videoWidth + ' / ' + video.videoHeight, width: Math.round(width) + 'px' });
-                }
-            };
-            apply();
-            video.addEventListener('loadedmetadata', apply);
-            video.addEventListener('resize', apply);
+            if (video.videoWidth && video.videoHeight) {
+                // Lebar dibatasi agar tinggi kotak maksimal 62% layar
+                let ratio = video.videoWidth / video.videoHeight;
+                let width = Math.min($('#cam').parent().width(), window.innerHeight * 0.62 * ratio);
+                $('#cam').css({ '--ar': video.videoWidth + ' / ' + video.videoHeight, width: Math.round(width) + 'px' });
+            }
         }
+        video.addEventListener('resize', fitCameraBox);
 
         $('#btnStartCam').on('click', startCamera);
+        // Jika browser menahan pemutaran otomatis, ketukan pada kamera memutar video
+        $('#cam').on('click', function(e) { if (!$(e.target).closest('button').length && stream) playVideo(); });
 
         $('#btnTorch').on('click', function() {
+            let track = stream ? stream.getVideoTracks()[0] : null;
+            if (!track) return;
             torchOn = !torchOn;
-            scanner.applyVideoConstraints({ advanced: [{ torch: torchOn }] })
+            track.applyConstraints({ advanced: [{ torch: torchOn }] })
                 .then(function() { $('#btnTorch').toggleClass('active', torchOn); })
                 .catch(function() { torchOn = !torchOn; });
         });
@@ -412,23 +447,26 @@
         $('#btnSwitch').on('click', function() {
             if (!cameras.length) return;
             cameraIndex = (cameraIndex + 1) % cameras.length;
-            simpleMode = 0;
             let label = cameras[cameraIndex].label || ('Kamera ' + (cameraIndex + 1));
-            scanner.stop().then(startCamera).catch(startCamera);
-            setTimeout(function() { camStatus(label); }, 1200);
-            setTimeout(function() { if (!$('#cam').hasClass('paused')) camStatus('Arahkan kamera ke QR di HP supir'); }, 3500);
+            startCamera();
+            setTimeout(function() { camStatus(label); }, 800);
+            setTimeout(function() { if (!$('#cam').hasClass('paused')) camStatus('Arahkan kamera ke QR di HP supir'); }, 3000);
         });
 
         function pauseCamera() {
             $('#cam').addClass('paused');
-            try { if (scanner && scanner.getState && scanner.getState() === Html5QrcodeScannerState.SCANNING) scanner.pause(true); } catch (e) {}
+            scanning = false;
+            clearTimeout(scanTimer);
+            try { video.pause(); } catch (e) {}
         }
 
         function resumeCamera() {
             $('#cam').removeClass('paused detected');
             camStatus('Arahkan kamera ke QR di HP supir');
-            try { if (scanner && scanner.getState && scanner.getState() === Html5QrcodeScannerState.PAUSED) scanner.resume(); } catch (e) {}
-            ensureVideoPlaying();
+            if (!stream) return;
+            playVideo();
+            scanning = true;
+            scanLoop();
         }
 
         function onDecoded(text) {
