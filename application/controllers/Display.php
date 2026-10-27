@@ -24,6 +24,7 @@ class Display extends MY_Controller {
 
     public function data($key = '') {
         $this->_check_key($key);
+        $this->_demo_tick();
 
         $kpi    = $this->_get_kpi_metrics();
         $queues = array();
@@ -50,6 +51,7 @@ class Display extends MY_Controller {
 
         $this->_json(array(
             'time'   => date('H:i:s'),
+            'demo'   => $this->demo_model->active(),
             'kpi'    => array(
                 'waiting'   => $kpi['truck_waiting'],
                 'in_yard'   => $kpi['truck_in_yard'],

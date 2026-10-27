@@ -17,7 +17,11 @@ class Control_tower extends MY_Controller {
     }
 
     public function index() {
+        $this->_demo_tick();
         $data = $this->_get_dashboard_data();
+        $data['demo_active']   = $this->demo_model->active();
+        $data['demo_has_data'] = $this->demo_model->has_data();
+        $data['demo_ready']    = $this->demo_model->ready();
         $data['admin_name'] = $this->session->userdata('name');
         $data['tv_url']     = base_url('display/tv/' . $this->_display_key());
 
@@ -27,7 +31,10 @@ class Control_tower extends MY_Controller {
     // Riwayat truk yang sudah selesai (Gate Out) dalam rentang tanggal
     public function history() {
         list($date_from, $date_to, $error) = $this->_history_range();
-        $rows = $error ? array() : $this->_get_history($date_from, $date_to);
+        // Selama ada data demo, riwayat ikut menampilkannya (ditandai DEMO)
+        $this->load->model('demo_model');
+        $include_demo = $this->demo_model->has_data();
+        $rows = $error ? array() : $this->_get_history($date_from, $date_to, $include_demo);
 
         $data = array(
             'date_from'  => $date_from,
@@ -35,6 +42,7 @@ class Control_tower extends MY_Controller {
             'error'      => $error,
             'rows'       => $rows,
             'summary'    => $this->_history_summary($rows),
+            'include_demo' => $include_demo,
             'admin_name' => $this->session->userdata('name')
         );
         $this->load->view('control_tower/history_view', $data);
@@ -47,7 +55,8 @@ class Control_tower extends MY_Controller {
             show_error($error, 400);
             return;
         }
-        $rows = $this->_get_history($date_from, $date_to);
+        $this->load->model('demo_model');
+        $rows = $this->_get_history($date_from, $date_to, $this->demo_model->has_data());
 
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="riwayat_lasmono_' . $date_from . '_sd_' . $date_to . '.csv"');
@@ -90,7 +99,7 @@ class Control_tower extends MY_Controller {
         return array($date_from, $date_to, $error);
     }
 
-    private function _get_history($date_from, $date_to) {
+    private function _get_history($date_from, $date_to, $include_demo = FALSE) {
         $rows = $this->db->query("
             SELECT q.*, z.zone_code, z.depo,
                    ugi.name AS gate_in_name, uss.name AS survey_start_name, uys.name AS yard_scan_name, ugo.name AS gate_out_name
@@ -100,7 +109,7 @@ class Control_tower extends MY_Controller {
             LEFT JOIN users uss ON uss.id = q.survey_start_by
             LEFT JOIN users uys ON uys.id = q.yard_scan_by
             LEFT JOIN users ugo ON ugo.id = q.gate_out_by
-            WHERE q.status = 'COMPLETED' AND q.gate_out_at >= ? AND q.gate_out_at <= ?
+            WHERE q.status = 'COMPLETED' AND q.gate_out_at >= ? AND q.gate_out_at <= ?" . ($include_demo ? '' : ' AND q.is_demo = 0') . "
             ORDER BY q.gate_out_at DESC
         ", array($date_from . ' 00:00:00', $date_to . ' 23:59:59'))->result_array();
 
@@ -202,7 +211,10 @@ class Control_tower extends MY_Controller {
 
     // Endpoint API untuk Auto-Refresh Data
     public function get_live_data() {
-        $this->_json($this->_get_dashboard_data());
+        $this->_demo_tick();
+        $data = $this->_get_dashboard_data();
+        $data['demo_active'] = $this->demo_model->active();
+        $this->_json($data);
     }
 
     private function _get_dashboard_data() {
@@ -257,6 +269,121 @@ class Control_tower extends MY_Controller {
             );
         }
         return $result;
+    }
+
+    // Dampak LASMONO: bandingkan dua periode (sebelum vs sesudah perbaikan)
+    public function impact() {
+        $this->load->model('demo_model');
+        $today = date('Y-m-d');
+        $b_to   = $this->_date_param('b_to', $today);
+        $b_from = $this->_date_param('b_from', date('Y-m-d', strtotime('-6 days')));
+        $a_to   = $this->_date_param('a_to', date('Y-m-d', strtotime($b_from . ' -1 day')));
+        $a_from = $this->_date_param('a_from', date('Y-m-d', strtotime($a_to . ' -6 days')));
+        $include_demo = $this->input->get('demo') !== NULL ? $this->input->get('demo') === '1' : $this->demo_model->has_data();
+
+        $error = NULL;
+        foreach (array(array($a_from, $a_to), array($b_from, $b_to)) as $range) {
+            if ($range[0] > $range[1]) {
+                $error = 'Tanggal awal periode tidak boleh melebihi tanggal akhir.';
+            } elseif ((strtotime($range[1]) - strtotime($range[0])) / 86400 > 93) {
+                $error = 'Setiap periode maksimal 93 hari.';
+            }
+        }
+
+        $periods = array();
+        if (!$error) {
+            foreach (array('a' => array($a_from, $a_to), 'b' => array($b_from, $b_to)) as $key => $range) {
+                $periods[$key] = $this->_impact_period($range[0], $range[1], $include_demo);
+            }
+        }
+
+        $this->load->view('control_tower/impact_view', array(
+            'a_from' => $a_from, 'a_to' => $a_to, 'b_from' => $b_from, 'b_to' => $b_to,
+            'include_demo' => $include_demo,
+            'demo_has_data' => $this->demo_model->has_data(),
+            'error' => $error,
+            'periods' => $periods,
+            'admin_name' => $this->session->userdata('name')
+        ));
+    }
+
+    private function _date_param($name, $default) {
+        $value = (string) $this->input->get($name);
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : $default;
+    }
+
+    // Ringkasan satu periode untuk halaman Dampak
+    private function _impact_period($date_from, $date_to, $include_demo) {
+        $rows = $this->_get_history($date_from, $date_to, $include_demo);
+        $days = (int) round((strtotime($date_to) - strtotime($date_from)) / 86400) + 1;
+
+        $tat = $wait = $service = array();
+        $daily = array();
+        for ($t = strtotime($date_from); $t <= strtotime($date_to); $t += 86400) {
+            $daily[date('Y-m-d', $t)] = array();
+        }
+        foreach ($rows as $r) {
+            if ($r['wait_minutes'] !== NULL) $wait[] = $r['wait_minutes'];
+            if ($r['total_minutes'] !== NULL) $service[] = $r['total_minutes'];
+            // Data dengan jam tidak wajar (durasi negatif) tidak dihitung
+            if ($r['wait_minutes'] !== NULL && $r['total_minutes'] !== NULL && $r['wait_minutes'] >= 0 && $r['total_minutes'] >= 0) {
+                $tat[] = $r['wait_minutes'] + $r['total_minutes'];
+                $day = substr($r['gate_out_at'], 0, 10);
+                if (isset($daily[$day])) $daily[$day][] = $r['wait_minutes'] + $r['total_minutes'];
+            }
+        }
+        $avg = function ($values) {
+            return count($values) ? round(array_sum($values) / count($values), 1) : NULL;
+        };
+        foreach ($daily as $day => $values) {
+            $daily[$day] = array('avg' => $avg($values), 'count' => count($values));
+        }
+
+        $sos = $this->db->query("
+            SELECT COUNT(*) AS total FROM sos_reports s JOIN queue_transactions q ON q.id = s.queue_id
+            WHERE s.created_at >= ? AND s.created_at <= ?" . ($include_demo ? '' : ' AND q.is_demo = 0'),
+            array($date_from . ' 00:00:00', $date_to . ' 23:59:59'))->row();
+
+        $summary = $this->_history_summary($rows);
+        return array(
+            'from'         => $date_from,
+            'to'           => $date_to,
+            'days'         => $days,
+            'trucks'       => count($rows),
+            'per_day'      => $days ? round(count($rows) / $days, 1) : 0,
+            'avg_tat'      => $avg($tat),
+            'avg_wait'     => $avg($wait),
+            'avg_service'  => $avg($service),
+            'kpi_percent'  => count($rows) ? (int) round($summary['all_achieved'] / count($rows) * 100) : NULL,
+            'stages'       => $summary['stages'],
+            'sos'          => (int) $sos->total,
+            'daily'        => $daily
+        );
+    }
+
+    // Mode Demo untuk presentasi
+    public function demo_start() {
+        $this->load->model('demo_model');
+        if ($this->demo_model->ready()) {
+            $this->demo_model->start();
+        }
+        redirect('control_tower');
+    }
+
+    public function demo_stop() {
+        $this->load->model('demo_model');
+        if ($this->demo_model->ready()) {
+            $this->demo_model->stop();
+        }
+        redirect('control_tower');
+    }
+
+    public function demo_clear() {
+        $this->load->model('demo_model');
+        if ($this->demo_model->ready()) {
+            $this->demo_model->clear();
+        }
+        redirect('control_tower');
     }
 
     // Tandai laporan SOS sudah ditindaklanjuti

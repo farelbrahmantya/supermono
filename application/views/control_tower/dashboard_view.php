@@ -35,6 +35,9 @@
         .principal-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #3b3f47; }
         .principal-legend i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
 
+        .demo-banner { background: #fff6dc; border: 1px solid #f6e2a8; color: #7a5100; border-radius: 14px; padding: 10px 16px; font-size: 13px; }
+        .btn-ct.demo-on { background: var(--lx-grad) !important; color: var(--lx-ink) !important; }
+
         /* Tab & filter aktivitas */
         .ct-tabs { gap: 6px; border-bottom: 1px solid var(--lx-border); }
         .ct-tabs .nav-link { color: var(--lx-muted); font-weight: 700; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 10px 14px; }
@@ -95,6 +98,31 @@
                 <i class="fas fa-bell me-1"></i> SOS <span class="badge bg-white text-danger ms-1" id="sosCount"><?php $open_sos = 0; foreach ($sos_reports as $sos) { if (!$sos->is_resolved) $open_sos++; } echo $open_sos; ?></span>
             </button>
             <a href="<?= html_escape($tv_url); ?>" target="_blank" rel="noopener" class="btn btn-tv fw-bold" title="Buka di browser TV, tanpa login"><i class="fas fa-tv me-1"></i> Layar TV</a>
+            <a href="<?= base_url('control_tower/impact'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-chart-line me-1"></i> Dampak</a>
+            <?php if ($demo_ready): ?>
+            <div class="dropdown">
+                <button class="btn btn-ct fw-semibold dropdown-toggle<?= $demo_active ? ' demo-on' : ''; ?>" type="button" data-bs-toggle="dropdown"><i class="fas fa-flask me-1"></i> Demo</button>
+                <div class="dropdown-menu dropdown-menu-end p-2" style="min-width: 260px;">
+                    <small class="text-muted d-block px-2 mb-2">Truk simulasi bergerak otomatis untuk presentasi. Tidak menyentuh database depo.</small>
+                    <form method="POST" action="<?= base_url('control_tower/demo_start'); ?>" onsubmit="return confirm('Mulai Mode Demo? Data demo lama akan diganti.');">
+                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
+                        <button class="dropdown-item rounded"><i class="fas fa-play me-2 text-success"></i><?= $demo_active ? 'Mulai ulang demo' : 'Mulai Mode Demo'; ?></button>
+                    </form>
+                    <?php if ($demo_active): ?>
+                    <form method="POST" action="<?= base_url('control_tower/demo_stop'); ?>">
+                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
+                        <button class="dropdown-item rounded"><i class="fas fa-pause me-2 text-warning"></i>Hentikan truk baru</button>
+                    </form>
+                    <?php endif; ?>
+                    <?php if ($demo_has_data): ?>
+                    <form method="POST" action="<?= base_url('control_tower/demo_clear'); ?>" onsubmit="return confirm('Hapus semua data demo?');">
+                        <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
+                        <button class="dropdown-item rounded text-danger"><i class="fas fa-trash me-2"></i>Hapus semua data demo</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
             <a href="<?= base_url('control_tower/history'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-clock-rotate-left me-1"></i> Riwayat</a>
             <a href="<?= base_url('yardman'); ?>" class="btn btn-ct fw-semibold"><i class="fas fa-qrcode me-1"></i> Scanner Yardman</a>
             <span class="lx-user">
@@ -105,6 +133,9 @@
     </header>
 
     <div class="container-fluid px-4">
+        <?php if ($demo_active || $demo_has_data): ?>
+            <div class="demo-banner mb-3"><i class="fas fa-flask me-2"></i><b>Mode Demo <?= $demo_active ? 'aktif' : '(berhenti)'; ?></b> &middot; data di dashboard, Layar TV, Riwayat, dan Dampak termasuk truk simulasi (nomor antrean DM-). Hapus lewat menu Demo setelah presentasi.</div>
+        <?php endif; ?>
         <!-- KPI Cards -->
         <div class="section-label">Ringkasan Hari Ini</div>
         <div class="row g-3 mb-4">

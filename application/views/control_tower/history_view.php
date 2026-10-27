@@ -78,6 +78,9 @@
             </div>
         </form>
 
+        <?php if (!empty($include_demo)): ?>
+            <div class="alert alert-warning small"><i class="fas fa-flask me-1"></i> Data <b>Mode Demo</b> (simulasi) ikut ditampilkan dan ditandai <span class="badge bg-warning text-dark">DEMO</span>. Hapus data demo dari dashboard Control Tower sebelum dipakai untuk laporan resmi.</div>
+        <?php endif; ?>
         <?php if ($error): ?>
             <div class="alert alert-danger"><?= html_escape($error); ?></div>
         <?php else: ?>
@@ -143,7 +146,7 @@
                         <?php foreach ($rows as $r): ?>
                             <tr>
                                 <td><?= $time_only($r['gate_out_at']); ?></td>
-                                <td class="fw-bold"><?= html_escape($r['queue_number']); ?></td>
+                                <td class="fw-bold"><?= html_escape($r['queue_number']); ?><?php if (!empty($r['is_demo'])): ?> <span class="badge bg-warning text-dark">DEMO</span><?php endif; ?></td>
                                 <td><span class="act-tag act-<?= html_escape($r['activity']); ?>"><?= html_escape($r['activity_label']); ?></span></td>
                                 <td class="fw-semibold"><?= html_escape($r['license_plate']); ?></td>
                                 <td><?= html_escape($r['container_no'] ? $r['container_no'] : '-'); ?></td>

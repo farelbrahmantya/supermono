@@ -107,7 +107,7 @@
         <div class="lg">Waktu tahap / target:<i class="sla-ok" style="background: #dcfce7;"></i>Aman<i style="background: #fef3c7;"></i>&ge; 80% target<i style="background: var(--lx-red);"></i>Lewat target
             <span class="acts"><span class="act-tag act-Z">Repo In</span><span class="act-tag act-A">Import</span><span class="act-tag act-D">Export</span><span class="act-tag act-E">Repo Out</span></span>
         </div>
-        <div><span class="tv-offline" id="tvOffline"><i class="fas fa-plug-circle-xmark me-1"></i> Koneksi terputus, mencoba lagi &middot; </span>Diperbarui <span id="tvUpdated">-</span></div>
+        <div><span class="act-tag" id="tvDemo" style="display: none; background: #fff3d1; color: #8a5a00; margin-right: .6rem;">MODE DEMO &middot; SIMULASI</span><span class="tv-offline" id="tvOffline"><i class="fas fa-plug-circle-xmark me-1"></i> Koneksi terputus, mencoba lagi &middot; </span>Diperbarui <span id="tvUpdated">-</span></div>
     </footer>
 
     <script>
@@ -196,6 +196,7 @@
                     document.getElementById('kOver').textContent = res.kpi.over_sla;
                     document.getElementById('kOverBox').classList.toggle('alert-on', res.kpi.over_sla > 0);
                     document.getElementById('tvUpdated').textContent = res.time;
+                    document.getElementById('tvDemo').style.display = res.demo ? 'inline-block' : 'none';
                     document.getElementById('tvOffline').classList.remove('show');
                     renderColumns();
                 } catch (e) { offline(); }

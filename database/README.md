@@ -16,6 +16,8 @@ Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5 (struktur tabel tetap sama dengan versi 
   daftar antrean; saat Gate In aktivitas tetap mengikuti kitir).
 - `upgrade_06_user_perusahaan.sql`: kolom sumber user (LOCAL / NEW_GENERAL) agar petugas bisa
   login dengan user aplikasi utama, plus contoh perintah GRANT SELECT ke `new_general`.
+- `upgrade_07_dampak_demo.sql`: penanda truk simulasi (`is_demo`) dan tabel `lasmono_settings`
+  untuk halaman Dampak & Mode Demo. Jalankan sebelum meng-upload file aplikasinya.
 - `lasmono_db.sql`: struktur lengkap + data awal untuk instalasi baru (misalnya laptop demo).
 
 Login petugas setelah upgrade: `yardman1`, `admin_ct`, `gate_in`, `gate_out` dengan password

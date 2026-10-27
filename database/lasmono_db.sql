@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   `cp_id` bigint(20) DEFAULT NULL,
   `activity` char(1) NOT NULL DEFAULT 'Z',
   `driver_activity` char(1) DEFAULT NULL,
+  `is_demo` tinyint(1) NOT NULL DEFAULT '0',
   `container_no` varchar(15) DEFAULT NULL,
   `principal` varchar(20) DEFAULT NULL,
   `container_size` varchar(30) DEFAULT NULL,
@@ -73,7 +74,15 @@ CREATE TABLE IF NOT EXISTS `queue_transactions` (
   KEY `idx_license_plate` (`license_plate`),
   KEY `idx_cp_id` (`cp_id`),
   KEY `idx_container_no` (`container_no`),
+  KEY `idx_is_demo` (`is_demo`),
   CONSTRAINT `fk_queue_zone` FOREIGN KEY (`current_zone_id`) REFERENCES `yard_zones` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `lasmono_settings` (
+  `name` varchar(50) NOT NULL,
+  `value` varchar(255) DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `sos_reports` (

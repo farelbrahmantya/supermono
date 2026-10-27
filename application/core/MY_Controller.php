@@ -172,6 +172,7 @@ class MY_Controller extends CI_Controller {
     protected function _minutes_per_gate_in() {
         $window = 120;
         $count = $this->db->where('gate_in_at >=', date('Y-m-d H:i:s', time() - $window * 60))
+                          ->where('is_demo', 0)
                           ->count_all_results('queue_transactions');
         return $count > 0 ? $window / $count : NULL;
     }
@@ -180,6 +181,7 @@ class MY_Controller extends CI_Controller {
     protected function _queue_position($queue) {
         return $this->db->where('status', 'WAITING_GATE')
                         ->where('created_at >=', $this->_expiry_cutoff())
+                        ->where('is_demo', 0)
                         ->where('id <=', $queue->id)
                         ->count_all_results('queue_transactions');
     }
@@ -193,7 +195,7 @@ class MY_Controller extends CI_Controller {
         $sql = "SELECT q.queue_number, q.license_plate, q.container_no, q.status, q.activity, z.zone_code, z.depo, TIMESTAMPDIFF(MINUTE, {$column}, ?) AS waiting_minutes
                 FROM queue_transactions q
                 LEFT JOIN yard_zones z ON z.id = q.current_zone_id
-                WHERE q.status = ?";
+                WHERE q.status = ? AND q.is_demo = 0";
         $params = array($this->_now(), $status);
         if ($status === 'WAITING_GATE') {
             $sql .= " AND q.created_at >= ?";
@@ -374,5 +376,11 @@ class MY_Controller extends CI_Controller {
         if ($minutes > $target) return 'over';
         if ($minutes >= $target * 0.8) return 'warning';
         return 'ok';
+    }
+
+    // Mode Demo: majukan truk simulasi (dipanggil dashboard Control Tower & Layar TV)
+    protected function _demo_tick() {
+        $this->load->model('demo_model');
+        $this->demo_model->tick();
     }
 }
