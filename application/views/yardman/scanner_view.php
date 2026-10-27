@@ -288,7 +288,10 @@
         let scanTimer = null;
         let frameNo = 0;
         let reader = null, canvas = null, ctx = null;
-        let lastDone = { code: '', time: 0 };
+        // Barcode yang baru saja diproses/ditampilkan: diabaikan selama masih terlihat kamera,
+        // dan baru bisa dipindai lagi setelah 2 detik tidak terlihat (mencegah pop up berulang)
+        let ignoreScan = { code: '', seen: 0 };
+        let lastScanned = '';
 
         function camStatus(text) { $('#camStatus').text(text); }
 
@@ -474,8 +477,11 @@
             let raw = String(text).trim().toUpperCase();
             let match = raw.match(/A-\d{8}-\d{3}/);
             let code = match ? match[0] : raw;
-            // QR yang baru diproses masih di depan kamera: abaikan beberapa detik
-            if (code === lastDone.code && Date.now() - lastDone.time < 6000) return;
+            if (code === ignoreScan.code && Date.now() - ignoreScan.seen < 2000) {
+                ignoreScan.seen = Date.now();
+                camStatus('Barcode ini sudah dipindai \u00b7 arahkan ke barcode lain');
+                return;
+            }
             $('#cam').addClass('detected');
             lookupQueue(code);
         }
@@ -493,6 +499,7 @@
 
         function lookupQueue(code) {
             busy = true;
+            lastScanned = code;
             pauseCamera();
             camStatus('Membaca data truk...');
             feedback(true);
@@ -656,6 +663,8 @@
 
         $('#btnSheetCancel').on('click', function() { sheet.hide(); });
         document.getElementById('confirmSheet').addEventListener('hidden.bs.offcanvas', function() {
+            // Apa pun hasilnya (sukses, peringatan, error), barcode yang sama tidak langsung terbaca ulang
+            ignoreScan = { code: lastScanned, seen: Date.now() };
             busy = false;
             current = null;
             resumeCamera();
@@ -675,7 +684,6 @@
                     sheetMessage(res.status === 'warning' ? 'warning' : 'danger', res.message);
                     return;
                 }
-                lastDone = { code: code, time: Date.now() };
                 showFlash(res.message);
                 addRecentScan(code, pickedContainer || (current ? current.queue.container_no : ''), res.message);
                 loadPending();
