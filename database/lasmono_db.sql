@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS `lasmono_settings` (
 CREATE TABLE IF NOT EXISTS `sos_reports` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `queue_id` bigint(20) NOT NULL,
-  `report_type` enum('PUNGLI','PENYEROBOTAN','LAINNYA') NOT NULL DEFAULT 'PUNGLI',
+  `report_type` enum('UNSAFE','PUNGLI','PENYEROBOTAN','LAINNYA') NOT NULL DEFAULT 'UNSAFE',
   `description` text,
   `media_path` varchar(255) DEFAULT NULL,
   `is_resolved` tinyint(1) NOT NULL DEFAULT '0',

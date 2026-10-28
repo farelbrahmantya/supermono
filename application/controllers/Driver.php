@@ -5,7 +5,8 @@ class Driver extends MY_Controller {
 
     protected $allowed_roles = array('DRIVER');
 
-    private $sos_types = array('PUNGLI', 'PENYEROBOTAN', 'LAINNYA');
+    // Jenis laporan SOS: kondisi tidak aman (HSE), pemungutan liar, penyerobotan antrean
+    private $sos_types = array('UNSAFE', 'PUNGLI', 'PENYEROBOTAN');
     const SOS_LIMIT_PER_QUEUE = 3;
 
     public function __construct() {

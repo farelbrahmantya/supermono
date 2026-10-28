@@ -371,7 +371,7 @@
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content border-0">
                 <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #ef4444, #b91c1c);">
-                    <h5 class="modal-title fw-bold"><i class="fas fa-bullhorn me-2"></i> Laporan SOS Pungli & Penyerobotan</h5>
+                    <h5 class="modal-title fw-bold"><i class="fas fa-bullhorn me-2"></i> Laporan SOS</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body p-0">
@@ -389,12 +389,13 @@
                             </tr>
                         </thead>
                         <tbody id="sosTableBody">
+                            <?php $sos_labels = array('UNSAFE' => 'KONDISI TIDAK AMAN', 'PUNGLI' => 'PEMUNGUTAN LIAR', 'PENYEROBOTAN' => 'PENYEROBOTAN ANTREAN', 'LAINNYA' => 'LAINNYA'); ?>
                             <?php foreach($sos_reports as $sos): ?>
                             <tr>
                                 <td><small><?= html_escape($sos->created_at); ?></small></td>
                                 <td><b>#<?= html_escape($sos->queue_number); ?></b></td>
                                 <td><?= html_escape($sos->license_plate); ?></td>
-                                <td><span class="badge bg-danger"><?= html_escape($sos->report_type); ?></span></td>
+                                <td><span class="badge <?= $sos->report_type === 'UNSAFE' ? 'bg-warning text-dark' : 'bg-danger'; ?>"><?= html_escape(isset($sos_labels[$sos->report_type]) ? $sos_labels[$sos->report_type] : $sos->report_type); ?></span></td>
                                 <td><?= html_escape($sos->description); ?></td>
                                 <td>
                                     <?php if(!empty($sos->media_path)): ?>
@@ -443,6 +444,9 @@
                 .fail(function() { done(false); });
         }
 
+        // Label jenis laporan SOS
+        const SOS_LABELS = { UNSAFE: 'KONDISI TIDAK AMAN', PUNGLI: 'PEMUNGUTAN LIAR', PENYEROBOTAN: 'PENYEROBOTAN ANTREAN', LAINNYA: 'LAINNYA' };
+        function sosLabel(type) { return SOS_LABELS[type] || type; }
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
         }
@@ -600,7 +604,7 @@
             if (!fresh.length) return;
 
             let sos = fresh[0];
-            $('#sosAlertType').text(sos.report_type);
+            $('#sosAlertType').text(sosLabel(sos.report_type)).toggleClass('bg-warning text-dark', sos.report_type === 'UNSAFE').toggleClass('bg-danger', sos.report_type !== 'UNSAFE');
             $('#sosAlertTime').text(sos.created_at);
             $('#sosAlertQueue').text(sos.queue_number);
             $('#sosAlertPlate').text(sos.license_plate);
@@ -633,7 +637,7 @@
                     '<td><small>' + esc(sos.created_at) + '</small></td>' +
                     '<td><b>#' + esc(sos.queue_number) + '</b></td>' +
                     '<td>' + esc(sos.license_plate) + '</td>' +
-                    '<td><span class="badge bg-danger">' + esc(sos.report_type) + '</span></td>' +
+                    '<td><span class="badge ' + (sos.report_type === 'UNSAFE' ? 'bg-warning text-dark' : 'bg-danger') + '">' + esc(sosLabel(sos.report_type)) + '</span></td>' +
                     '<td>' + esc(sos.description) + '</td>' +
                     '<td>' + media + '</td>' +
                     '<td>' + status + '</td>' +

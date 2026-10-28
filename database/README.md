@@ -20,6 +20,8 @@ Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5 (struktur tabel tetap sama dengan versi 
   untuk halaman Dampak & Mode Demo. Jalankan sebelum meng-upload file aplikasinya.
 - `upgrade_08_lift_off.sql`: tahap Lift Off untuk Repo In & Import (status `LIFT_OFF`, kolom
   `lift_off_at` / `lift_off_by`). Alur menjadi Gate In - Survey - Lift Off - Gate Out, target 25 menit.
+- `upgrade_09_jenis_sos.sql`: jenis laporan SOS Kondisi Tidak Aman (Unsafe Condition), Pemungutan Liar,
+  dan Penyerobotan Antrean.
 - `lasmono_db.sql`: struktur lengkap + data awal untuk instalasi baru (misalnya laptop demo).
 
 Login petugas setelah upgrade: `yardman1`, `admin_ct`, `gate_in`, `gate_out` dengan password

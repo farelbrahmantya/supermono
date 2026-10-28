@@ -237,7 +237,7 @@
             <div class="modal-content">
                 <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #ef4444, #b91c1c);">
                     <div>
-                        <h5 class="modal-title fw-bold mb-0"><i class="fas fa-bullhorn me-2"></i> Lapor Pungli / Penyerobotan</h5>
+                        <h5 class="modal-title fw-bold mb-0"><i class="fas fa-bullhorn me-2"></i> Lapor SOS</h5>
                         <small style="opacity: .85;">Laporan langsung diterima Control Tower</small>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -246,11 +246,11 @@
                     <div class="modal-body">
                         <input type="hidden" name="<?= $this->security->get_csrf_token_name(); ?>" value="<?= $this->security->get_csrf_hash(); ?>">
                         <div class="mb-3">
-                            <label class="form-label small fw-bold text-secondary">JENIS PELANGGARAN</label>
+                            <label class="form-label small fw-bold text-secondary">JENIS LAPORAN</label>
                             <select name="report_type" class="form-select fw-semibold" required>
-                                <option value="PUNGLI">Indikasi Pungli</option>
+                                <option value="UNSAFE">Kondisi Tidak Aman (Unsafe Condition)</option>
+                                <option value="PUNGLI">Pemungutan Liar</option>
                                 <option value="PENYEROBOTAN">Penyerobotan Antrean</option>
-                                <option value="LAINNYA">Lainnya</option>
                             </select>
                         </div>
                         <div class="mb-3">
