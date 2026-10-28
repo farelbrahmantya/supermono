@@ -183,7 +183,7 @@
                     </div>
                     <div class="feature">
                         <span class="ico" style="background: rgba(16, 185, 129, .2); color: #6ee7b7;"><i class="fas fa-stopwatch"></i></span>
-                        <div><b>KPI per tahap</b><small>Gate In, Survey, Gate Out masing-masing terukur 5 menit</small></div>
+                        <div><b>KPI per tahap</b><small>Gate In, Survey, Lift Off, Gate Out terukur per tahap</small></div>
                     </div>
                     <div class="feature">
                         <span class="ico" style="background: rgba(239, 68, 68, .2); color: #fca5a5;"><i class="fas fa-shield-halved"></i></span>

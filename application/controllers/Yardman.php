@@ -17,18 +17,20 @@ class Yardman extends MY_Controller {
         $this->load->view('yardman/scanner_view', $data);
     }
 
-    // Truk yang menunggu masuk survey (sudah Gate In) dan yang sedang survey
+    // Truk yang menunggu masuk survey (sudah Gate In), yang sedang survey, dan yang menunggu lift off di blok
     public function pending_json() {
         $this->_json(array(
             'waiting_survey' => $this->_pending_queues('IN_YARD'),
-            'in_survey'      => $this->_pending_queues('IN_SURVEY')
+            'in_survey'      => $this->_pending_queues('IN_SURVEY'),
+            'lift_off'       => $this->_pending_queues('LIFT_OFF')
         ));
     }
 
     // Scan QR supir / kitir oleh Yardman:
-    //   Repo In & Import (Z/A) 2x scan:
+    //   Repo In & Import (Z/A) 3x scan (Yardman / surveyor / operator alat):
     //     scan 1: IN_YARD   -> IN_SURVEY (truk masuk area survey)
-    //     scan 2: IN_SURVEY -> AT_YARD   (survey selesai, blok penempatan wajib dipilih)
+    //     scan 2: IN_SURVEY -> LIFT_OFF  (survey selesai, blok penempatan wajib dipilih)
+    //     scan 3: LIFT_OFF  -> AT_YARD   (container sudah diturunkan di blok, truk menuju Gate Out)
     //   Export & Repo Out (D/E) tanpa survey, 1x submit muat: IN_YARD -> AT_YARD
     //     Export  : Yardman input nomor container yang dipilih (dicek ke new_sby)
     //     Repo Out: container sudah diplot di kitir, Yardman cukup konfirmasi + blok
@@ -44,6 +46,8 @@ class Yardman extends MY_Controller {
         }
 
         $stage = $this->_current_stage($queue);
+        $zone  = $queue->current_zone_id ? $this->db->get_where('yard_zones', array('id' => $queue->current_zone_id))->row() : NULL;
+        $since = array(1 => $queue->gate_in_at, 2 => $queue->survey_start_at, 3 => $queue->gate_in_at, 4 => $queue->yard_scan_at);
         $this->_json(array(
             'status' => 'success',
             'step'   => $check['step'],
@@ -58,8 +62,10 @@ class Yardman extends MY_Controller {
                 'principal'      => $queue->principal,
                 'container_size' => $queue->container_size,
                 'customer'       => $queue->customer,
-                'stage_minutes'  => (int) floor((time() - strtotime($check['step'] === 2 ? $queue->survey_start_at : $queue->gate_in_at)) / 60),
-                'stage_target'   => $stage ? $stage[3] : self::STAGE_KPI_MINUTES
+                'stage_minutes'  => (int) floor((time() - strtotime($since[$check['step']])) / 60),
+                'stage_target'   => $stage ? $stage[3] : self::STAGE_KPI_MINUTES,
+                'zone_code'      => $zone ? $zone->zone_code : NULL,
+                'depo'           => $zone ? $zone->depo : NULL
             )
         ));
     }
@@ -113,6 +119,19 @@ class Yardman extends MY_Controller {
             return;
         }
 
+        // SCAN 3: container sudah diturunkan (lift off) di blok penempatan
+        if ($check['step'] === 4) {
+            $updated = $this->_transition($queue->id, 'LIFT_OFF', array(
+                'status'      => 'AT_YARD',
+                'lift_off_at' => $this->_now(),
+                'lift_off_by' => $user_id
+            ));
+            $this->_json($updated
+                ? array('status' => 'success', 'message' => "LIFT OFF SELESAI!\nContainer {$queue->container_no} ({$queue->license_plate}) sudah diturunkan.\nSelanjutnya truk menuju Gate Out.")
+                : array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah diproses petugas lain."));
+            return;
+        }
+
         // SCAN 2: survey selesai, blok penempatan ditentukan Yardman
         $zone = NULL;
         if ($zone_code !== '') {
@@ -127,7 +146,7 @@ class Yardman extends MY_Controller {
         }
 
         $update = array(
-            'status'       => 'AT_YARD',
+            'status'       => 'LIFT_OFF',
             'yard_scan_at' => $this->_now(),
             'yard_scan_by' => $user_id
         );
@@ -143,7 +162,7 @@ class Yardman extends MY_Controller {
         $zone_text = $zone ? "\nPenempatan: {$zone->depo} - Blok {$zone->zone_code}." : '';
         $this->_json(array(
             'status'  => 'success',
-            'message' => "SURVEY SELESAI!\nContainer {$queue->container_no} ({$queue->license_plate}).{$zone_text}"
+            'message' => "SURVEY SELESAI!\nContainer {$queue->container_no} ({$queue->license_plate}).{$zone_text}\nScan lagi setelah container di-lift off."
         ));
     }
 
@@ -260,8 +279,18 @@ class Yardman extends MY_Controller {
         if ($queue->status == 'IN_SURVEY') {
             return array('step' => 2);
         }
+        if ($queue->status == 'LIFT_OFF') {
+            return array('step' => 4);
+        }
         if ($queue->status == 'AT_YARD') {
-            return array('status' => 'warning', 'message' => ($this->_is_muat($queue->activity) ? 'Muat container' : 'Survey') . " antrean {$queue->queue_number} sudah selesai pada {$queue->yard_scan_at}.\nSelanjutnya scan di Gate Out.");
+            if ($this->_is_muat($queue->activity)) {
+                $what = 'Muat container';
+                $when = $queue->yard_scan_at;
+            } else {
+                $what = $queue->lift_off_at ? 'Lift off container' : 'Survey';
+                $when = $queue->lift_off_at ? $queue->lift_off_at : $queue->yard_scan_at;
+            }
+            return array('status' => 'warning', 'message' => "{$what} antrean {$queue->queue_number} sudah selesai pada {$when}.\nSelanjutnya scan di Gate Out.");
         }
         return array('status' => 'warning', 'message' => "Antrean {$queue->queue_number} sudah berstatus {$queue->status}.");
     }

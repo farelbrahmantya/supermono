@@ -133,6 +133,7 @@
                             <th>Antre</th>
                             <th>Gate In</th>
                             <th>Survey</th>
+                            <th>Lift Off</th>
                             <th>Muat</th>
                             <th>Gate Out</th>
                             <th>Total</th>
@@ -141,7 +142,7 @@
                     </thead>
                     <tbody>
                         <?php if (empty($rows)): ?>
-                            <tr><td colspan="16" class="text-center text-muted py-4">Tidak ada truk yang selesai pada rentang tanggal ini.</td></tr>
+                            <tr><td colspan="17" class="text-center text-muted py-4">Tidak ada truk yang selesai pada rentang tanggal ini.</td></tr>
                         <?php endif; ?>
                         <?php foreach ($rows as $r): ?>
                             <tr>
@@ -157,6 +158,7 @@
                                 <td class="text-muted"><?= $r['wait_minutes'] === NULL ? '-' : $r['wait_minutes']; ?></td>
                                 <td><?= $stage_cell($r['stage_gate_in'], $target); ?></td>
                                 <td><?= $stage_cell($r['stage_survey'], $target); ?></td>
+                                <td><?= $stage_cell($r['stage_lift_off'], MY_Controller::LIFT_OFF_KPI_MINUTES); ?></td>
                                 <td><?= $stage_cell($r['stage_muat'], $r['muat_target']); ?></td>
                                 <td><?= $stage_cell($r['stage_gate_out'], $target); ?></td>
                                 <td><?= $stage_cell($r['total_minutes'], $r['total_target']); ?></td>

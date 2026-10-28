@@ -65,17 +65,17 @@ class Control_tower extends MY_Controller {
         fwrite($out, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8
         fputcsv($out, array(
             'No. Antrean', 'Aktivitas', 'Nopol', 'No. HP Supir', 'No. Container', 'Principal', 'Size', 'Customer', 'Depo', 'Blok',
-            'Daftar', 'Gate In', 'Masuk Survey', 'Selesai Survey', 'Gate Out',
-            'Antre (mnt)', 'Tahap Gate In (mnt)', 'Tahap Survey (mnt)', 'Tahap Muat Container (mnt)', 'Tahap Gate Out (mnt)', 'Total Proses (mnt)', 'Capai KPI Semua Tahap',
-            'Petugas Gate In', 'Yardman Survey', 'Yardman Selesai', 'Petugas Gate Out'
+            'Daftar', 'Gate In', 'Masuk Survey', 'Selesai Survey', 'Lift Off', 'Gate Out',
+            'Antre (mnt)', 'Tahap Gate In (mnt)', 'Tahap Survey (mnt)', 'Tahap Lift Off (mnt)', 'Tahap Muat Container (mnt)', 'Tahap Gate Out (mnt)', 'Total Proses (mnt)', 'Capai KPI Semua Tahap',
+            'Petugas Gate In', 'Yardman Survey', 'Yardman Selesai', 'Yardman Lift Off', 'Petugas Gate Out'
         ), ';');
         foreach ($rows as $r) {
             fputcsv($out, array(
                 $r['queue_number'], $r['activity_label'], $r['license_plate'], $r['driver_phone'], $r['container_no'], $r['principal'], $r['container_size'], $r['customer'], $r['depo'], $r['zone_code'],
-                $r['created_at'], $r['gate_in_at'], $r['survey_start_at'], $r['yard_scan_at'], $r['gate_out_at'],
-                $this->_csv_number($r['wait_minutes']), $this->_csv_number($r['stage_gate_in']), $this->_csv_number($r['stage_survey']),
+                $r['created_at'], $r['gate_in_at'], $r['survey_start_at'], $r['yard_scan_at'], $r['lift_off_at'], $r['gate_out_at'],
+                $this->_csv_number($r['wait_minutes']), $this->_csv_number($r['stage_gate_in']), $this->_csv_number($r['stage_survey']), $this->_csv_number($r['stage_lift_off']),
                 $this->_csv_number($r['stage_muat']), $this->_csv_number($r['stage_gate_out']), $this->_csv_number($r['total_minutes']), $r['all_achieved'] ? 'YA' : 'TIDAK',
-                $r['gate_in_name'], $r['survey_start_name'], $r['yard_scan_name'], $r['gate_out_name']
+                $r['gate_in_name'], $r['survey_start_name'], $r['yard_scan_name'], $r['lift_off_name'], $r['gate_out_name']
             ), ';');
         }
         fclose($out);
@@ -102,25 +102,26 @@ class Control_tower extends MY_Controller {
     private function _get_history($date_from, $date_to, $include_demo = FALSE) {
         $rows = $this->db->query("
             SELECT q.*, z.zone_code, z.depo,
-                   ugi.name AS gate_in_name, uss.name AS survey_start_name, uys.name AS yard_scan_name, ugo.name AS gate_out_name
+                   ugi.name AS gate_in_name, uss.name AS survey_start_name, uys.name AS yard_scan_name, ulo.name AS lift_off_name, ugo.name AS gate_out_name
             FROM queue_transactions q
             LEFT JOIN yard_zones z ON z.id = q.current_zone_id
             LEFT JOIN users ugi ON ugi.id = q.gate_in_by
             LEFT JOIN users uss ON uss.id = q.survey_start_by
             LEFT JOIN users uys ON uys.id = q.yard_scan_by
+            LEFT JOIN users ulo ON ulo.id = q.lift_off_by
             LEFT JOIN users ugo ON ugo.id = q.gate_out_by
             WHERE q.status = 'COMPLETED' AND q.gate_out_at >= ? AND q.gate_out_at <= ?" . ($include_demo ? '' : ' AND q.is_demo = 0') . "
             ORDER BY q.gate_out_at DESC
         ", array($date_from . ' 00:00:00', $date_to . ' 23:59:59'))->result_array();
 
         foreach ($rows as &$r) {
-            $plan = $this->_stage_plan($r['activity']);
+            $plan = $this->_stage_plan($r['activity'], $this->_is_legacy($r));
 
             $r['activity_label'] = $this->_activity_label($r['activity']);
             $r['wait_minutes']   = $this->_minutes_between($r['created_at'], $r['gate_in_at']);
             $r['total_minutes']  = $this->_minutes_between($r['gate_in_at'], $r['gate_out_at']);
             $r['total_target']   = $this->_total_target($r['activity']);
-            $r['stage_gate_in']  = $r['stage_survey'] = $r['stage_muat'] = $r['stage_gate_out'] = NULL;
+            $r['stage_gate_in']  = $r['stage_survey'] = $r['stage_lift_off'] = $r['stage_muat'] = $r['stage_gate_out'] = NULL;
             $r['muat_target']    = NULL;
             // Durasi per tahap: kunci tahap => menit
             $r['stages']         = array();
@@ -135,6 +136,7 @@ class Control_tower extends MY_Controller {
             }
             $r['stage_gate_in']  = isset($r['stages']['gate_in']) ? $r['stages']['gate_in'] : NULL;
             $r['stage_survey']   = isset($r['stages']['survey']) ? $r['stages']['survey'] : NULL;
+            $r['stage_lift_off'] = isset($r['stages']['lift_off']) ? $r['stages']['lift_off'] : NULL;
             $r['stage_gate_out'] = $r['stages']['gate_out'];
             foreach (array('pick', 'load') as $key) {
                 if (array_key_exists($key, $plan)) {
@@ -230,14 +232,14 @@ class Control_tower extends MY_Controller {
     // KPI per tahap untuk truk yang Gate Out hari ini: rata-rata menit & jumlah yang mencapai target
     private function _get_stage_kpi() {
         $rows = $this->db->query("
-            SELECT activity, gate_in_at, survey_start_at, yard_scan_at, gate_out_at
+            SELECT activity, gate_in_at, survey_start_at, yard_scan_at, lift_off_at, gate_out_at
             FROM queue_transactions
             WHERE status = 'COMPLETED' AND gate_out_at >= ?
         ", array(date('Y-m-d 00:00:00')))->result_array();
 
         $stats = array();
         foreach ($rows as $r) {
-            foreach ($this->_stage_plan($r['activity']) as $key => $stage) {
+            foreach ($this->_stage_plan($r['activity'], $this->_is_legacy($r)) as $key => $stage) {
                 $minutes = $this->_minutes_between($r[$stage[2]], $r[$stage[3]]);
                 if ($minutes === NULL) {
                     continue;
@@ -405,12 +407,12 @@ class Control_tower extends MY_Controller {
     }
 
     private function _get_yard_density() {
-        // Traffic trucking di jalan akses tiap blok: truk yang sudah diarahkan ke blok (survey selesai)
-        // dan belum Gate Out. Bukan isi tumpukan container di blok.
+        // Traffic trucking di jalan akses tiap blok: truk yang sudah diarahkan ke blok (survey selesai,
+        // sedang lift off atau menunggu Gate Out) dan belum Gate Out. Bukan isi tumpukan container di blok.
         $rows = $this->db->query("
             SELECT z.zone_code, z.depo, z.principal, z.principal_color, COUNT(q.id) AS total
             FROM yard_zones z
-            LEFT JOIN queue_transactions q ON q.current_zone_id = z.id AND q.status = 'AT_YARD'
+            LEFT JOIN queue_transactions q ON q.current_zone_id = z.id AND q.status IN ('LIFT_OFF', 'AT_YARD')
             GROUP BY z.id, z.zone_code, z.depo, z.principal, z.principal_color
             ORDER BY z.depo ASC, z.zone_code ASC
         ")->result();

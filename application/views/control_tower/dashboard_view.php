@@ -235,6 +235,18 @@
                 </div>
             </div>
             <div class="col-md-6 col-xl">
+                <div class="stage-card" data-stage="lift_off" role="button" tabindex="0">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <small class="text-muted d-block mb-1">Tahap Lift Off (Repo In / Import)</small>
+                            <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
+                            <small class="stage-overdue text-muted">Survey selesai &rarr; container diturunkan</small>
+                        </div>
+                        <div class="icon-kpi-wrapper" style="background-color: #ede4ff; color: #6d28d9;"><i class="fas fa-arrows-down-to-line fa-lg"></i></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-xl">
                 <div class="stage-card" data-stage="muat" role="button" tabindex="0">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
@@ -252,7 +264,7 @@
                         <div>
                             <small class="text-muted d-block mb-1">Tahap Gate Out</small>
                             <h3 class="fw-bold mb-0"><span class="stage-count">0</span> <small class="fs-6 text-muted">truk</small></h3>
-                            <small class="stage-overdue text-muted">Survey / muat &rarr; Gate Out</small>
+                            <small class="stage-overdue text-muted">Lift off / muat &rarr; Gate Out</small>
                         </div>
                         <div class="icon-kpi-wrapper" style="background-color: #dcfce7; color: #059669;"><i class="fas fa-sign-out-alt fa-lg"></i></div>
                     </div>
@@ -437,7 +449,8 @@
 
         const STAGE_KPI = <?= MY_Controller::STAGE_KPI_MINUTES; ?>;
         const EXPORT_KPI = <?= MY_Controller::EXPORT_PICK_KPI_MINUTES; ?>;
-        const STAGE_TITLES = { antre: 'Antre Gate In', gate_in: 'Tahap Gate In', survey: 'Tahap Survey', muat: 'Tahap Muat', gate_out: 'Tahap Gate Out' };
+        const LIFT_OFF_KPI = <?= MY_Controller::LIFT_OFF_KPI_MINUTES; ?>;
+        const STAGE_TITLES = { antre: 'Antre Gate In', gate_in: 'Tahap Gate In', survey: 'Tahap Survey', lift_off: 'Tahap Lift Off', muat: 'Tahap Muat', gate_out: 'Tahap Gate Out' };
         // Tahap pilih container (Export) & muat (Repo Out) digabung di kartu "Tahap Muat"
         function cardStage(q) { return (q.stage === 'pick' || q.stage === 'load') ? 'muat' : q.stage; }
         let activeStage = null;
@@ -453,7 +466,7 @@
                 if (stage !== 'antre') {
                     card.find('.stage-overdue')
                         .toggleClass('stage-late', late > 0)
-                        .text(late > 0 ? late + ' truk lewat target!' : (stage === 'muat' ? 'Dalam target (Export \u2264 ' + EXPORT_KPI + ', Repo Out \u2264 ' + STAGE_KPI + ' mnt)' : 'Semua dalam target \u2264 ' + STAGE_KPI + ' menit'));
+                        .text(late > 0 ? late + ' truk lewat target!' : (stage === 'muat' ? 'Dalam target (Export \u2264 ' + EXPORT_KPI + ', Repo Out \u2264 ' + STAGE_KPI + ' mnt)' : 'Semua dalam target \u2264 ' + (stage === 'lift_off' ? LIFT_OFF_KPI : STAGE_KPI) + ' menit'));
                 }
             });
         }

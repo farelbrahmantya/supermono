@@ -78,7 +78,7 @@ class Demo_model extends CI_Model {
         }
         $active = $this->setting('demo_active') === '1';
         $queues = $this->db->where('is_demo', 1)
-                           ->where_in('status', array('WAITING_GATE', 'IN_YARD', 'IN_SURVEY', 'AT_YARD'))
+                           ->where_in('status', array('WAITING_GATE', 'IN_YARD', 'IN_SURVEY', 'LIFT_OFF', 'AT_YARD'))
                            ->order_by('id', 'ASC')
                            ->get('queue_transactions')->result();
         if (!$active && empty($queues)) {
@@ -108,7 +108,9 @@ class Demo_model extends CI_Model {
             } elseif ($q->status === 'IN_YARD') {
                 $this->_update($q->id, array('status' => 'IN_SURVEY', 'survey_start_at' => $stamp));
             } elseif ($q->status === 'IN_SURVEY') {
-                $this->_update($q->id, array('status' => 'AT_YARD', 'yard_scan_at' => $stamp, 'current_zone_id' => $this->_zone_for($q->principal, $q->id)));
+                $this->_update($q->id, array('status' => 'LIFT_OFF', 'yard_scan_at' => $stamp, 'current_zone_id' => $this->_zone_for($q->principal, $q->id)));
+            } elseif ($q->status === 'LIFT_OFF') {
+                $this->_update($q->id, array('status' => 'AT_YARD', 'lift_off_at' => $stamp));
             } else {
                 $this->_update($q->id, array('status' => 'COMPLETED', 'gate_out_at' => $stamp));
             }
@@ -131,7 +133,10 @@ class Demo_model extends CI_Model {
     }
 
     private function _stage_start($q) {
-        $map = array('WAITING_GATE' => 'created_at', 'IN_YARD' => 'gate_in_at', 'IN_SURVEY' => 'survey_start_at', 'AT_YARD' => 'yard_scan_at');
+        $map = array('WAITING_GATE' => 'created_at', 'IN_YARD' => 'gate_in_at', 'IN_SURVEY' => 'survey_start_at', 'LIFT_OFF' => 'yard_scan_at', 'AT_YARD' => 'yard_scan_at');
+        if ($q->status === 'AT_YARD' && !empty($q->lift_off_at)) {
+            return $q->lift_off_at;
+        }
         return $q->{$map[$q->status]};
     }
 
@@ -142,10 +147,10 @@ class Demo_model extends CI_Model {
             return 40 + $h % 140;
         }
         if ($h % 100 < 15) {
-            $limit = ($status === 'IN_YARD' && $activity === 'D') ? 600 : 300;
+            $limit = (($status === 'IN_YARD' && $activity === 'D') || $status === 'LIFT_OFF') ? 600 : 300;
             return $limit + 20 + $h % 120;
         }
-        return 30 + $h % 150;
+        return ($status === 'LIFT_OFF' ? 90 : 30) + $h % 150;
     }
 
     private function _zones() {
@@ -185,7 +190,8 @@ class Demo_model extends CI_Model {
         $roll = abs(crc32('a' . $seed)) % 100;
         $activity = $roll < 35 ? 'Z' : ($roll < 60 ? 'A' : ($roll < 85 ? 'D' : 'E'));
         $principal = $this->_pick(array_keys($this->principals), 'p' . $seed);
-        $targets = array('Z' => 15, 'A' => 15, 'D' => 15, 'E' => 10);
+        // Repo In / Import: Gate In 5 + Survey 5 + Lift Off 10 + Gate Out 5
+        $targets = array('Z' => 25, 'A' => 25, 'D' => 15, 'E' => 10);
 
         $row = array(
             'queue_number'       => $this->_next_number($created),
@@ -203,13 +209,15 @@ class Demo_model extends CI_Model {
             'created_at'         => date('Y-m-d H:i:s', $created),
             'is_demo'            => 1
         );
-        foreach (array('gate_in_at', 'survey_start_at', 'yard_scan_at', 'gate_out_at') as $col) {
+        foreach (array('gate_in_at', 'survey_start_at', 'yard_scan_at', 'lift_off_at', 'gate_out_at') as $col) {
             $row[$col] = isset($times[$col]) ? date('Y-m-d H:i:s', $times[$col]) : NULL;
         }
-        // Export & Repo Out tidak melalui survey
+        // Export & Repo Out tidak melalui survey & lift off
         if (in_array($activity, array('D', 'E'), TRUE)) {
             $row['survey_start_at'] = NULL;
+            $row['lift_off_at'] = NULL;
             if ($status === 'IN_SURVEY') $row['status'] = 'IN_YARD';
+            if ($status === 'LIFT_OFF') $row['status'] = 'AT_YARD';
         }
         if (!empty($times['yard_scan_at'])) {
             $row['current_zone_id'] = $this->_zone_for($principal, $seed);
@@ -241,12 +249,14 @@ class Demo_model extends CI_Model {
                 $s1    = $slow ? mt_rand(3, 12) : mt_rand(1, 6);
                 $s2    = $slow ? mt_rand(3, 11) : mt_rand(1, 5);
                 $s3    = $slow ? mt_rand(3, 10) : mt_rand(1, 5);
+                $lift  = $slow ? mt_rand(6, 18) : mt_rand(3, 9);
                 $gate_in = $created + $wait * 60;
                 $times = array(
                     'gate_in_at'      => $gate_in,
                     'survey_start_at' => $gate_in + $s1 * 60,
                     'yard_scan_at'    => $gate_in + ($s1 + $s2) * 60,
-                    'gate_out_at'     => $gate_in + ($s1 + $s2 + $s3) * 60
+                    'lift_off_at'     => $gate_in + ($s1 + $s2 + $lift) * 60,
+                    'gate_out_at'     => $gate_in + ($s1 + $s2 + $lift + $s3) * 60
                 );
                 if ($times['gate_out_at'] > time()) {
                     continue;
@@ -267,8 +277,10 @@ class Demo_model extends CI_Model {
             array('IN_YARD', 9, array('gate_in_at' => 4)),
             array('IN_SURVEY', 10, array('gate_in_at' => 6, 'survey_start_at' => 3)),
             array('IN_SURVEY', 12, array('gate_in_at' => 9, 'survey_start_at' => 1)),
-            array('AT_YARD', 14, array('gate_in_at' => 10, 'survey_start_at' => 7, 'yard_scan_at' => 2)),
-            array('AT_YARD', 16, array('gate_in_at' => 12, 'survey_start_at' => 9, 'yard_scan_at' => 4))
+            array('LIFT_OFF', 14, array('gate_in_at' => 10, 'survey_start_at' => 7, 'yard_scan_at' => 3)),
+            array('LIFT_OFF', 15, array('gate_in_at' => 11, 'survey_start_at' => 8, 'yard_scan_at' => 5)),
+            array('AT_YARD', 18, array('gate_in_at' => 14, 'survey_start_at' => 11, 'yard_scan_at' => 8, 'lift_off_at' => 2)),
+            array('AT_YARD', 20, array('gate_in_at' => 16, 'survey_start_at' => 13, 'yard_scan_at' => 10, 'lift_off_at' => 3))
         );
         foreach ($plan as $p) {
             $times = array();

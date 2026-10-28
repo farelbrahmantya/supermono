@@ -31,7 +31,7 @@
         .tv-kpi.alert-on { border-color: var(--lx-red); background: #fff5f5; }
         .tv-kpi.alert-on .num { color: var(--lx-red); }
 
-        .tv-board { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; padding: .8rem 1.6rem; }
+        .tv-board { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; padding: .8rem 1.6rem; }
         .tv-col { display: flex; flex-direction: column; min-height: 0; background: #fbfaf7; border: 1px solid var(--lx-border); border-radius: 1rem; overflow: hidden; }
         .tv-col-head { display: flex; align-items: center; justify-content: space-between; padding: .75rem 1rem; background: #fff; border-top: .35rem solid var(--col); border-bottom: 1px solid var(--lx-border); }
         .tv-col-head h2 { margin: 0; font-size: 1.25rem; font-weight: 800; letter-spacing: -.01em; }
@@ -93,12 +93,16 @@
             <div class="tv-col-head"><div><h2><i class="fas fa-magnifying-glass"></i>Survey</h2><small>Repo In &amp; Import</small></div><span class="tv-count">0</span></div>
             <div class="tv-cards"></div><div class="tv-page"></div>
         </div>
+        <div class="tv-col" data-col="lift_off" style="--col: #6d28d9;">
+            <div class="tv-col-head"><div><h2><i class="fas fa-arrows-down-to-line"></i>Lift Off</h2><small>Turun container di blok</small></div><span class="tv-count">0</span></div>
+            <div class="tv-cards"></div><div class="tv-page"></div>
+        </div>
         <div class="tv-col" data-col="muat" style="--col: #1d4ed8;">
             <div class="tv-col-head"><div><h2><i class="fas fa-dolly"></i>Muat Container</h2><small>Export &amp; Repo Out</small></div><span class="tv-count">0</span></div>
             <div class="tv-cards"></div><div class="tv-page"></div>
         </div>
         <div class="tv-col" data-col="gate_out" style="--col: #10b981;">
-            <div class="tv-col-head"><div><h2><i class="fas fa-right-from-bracket"></i>Menuju Gate Out</h2><small>Survey / muat selesai</small></div><span class="tv-count">0</span></div>
+            <div class="tv-col-head"><div><h2><i class="fas fa-right-from-bracket"></i>Menuju Gate Out</h2><small>Lift off / muat selesai</small></div><span class="tv-count">0</span></div>
             <div class="tv-cards"></div><div class="tv-page"></div>
         </div>
     </main>
@@ -116,7 +120,7 @@
         var PAGE_SECONDS = 8;
         var DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
         var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-        var columns = { antre: [], survey: [], muat: [], gate_out: [] };
+        var columns = { antre: [], survey: [], lift_off: [], muat: [], gate_out: [] };
         var page = 0;
 
         function esc(v) {
@@ -132,10 +136,11 @@
             document.getElementById('tvDate').textContent = DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
         }
 
-        // Kolom tampilan per tahap: survey (Repo In/Import), muat (Export/Repo Out)
+        // Kolom tampilan per tahap: survey & lift off (Repo In/Import), muat (Export/Repo Out)
         function columnOf(q) {
             if (q.stage === 'antre') return 'antre';
             if (q.stage === 'gate_out') return 'gate_out';
+            if (q.stage === 'lift_off') return 'lift_off';
             if (q.stage === 'pick' || q.stage === 'load') return 'muat';
             return 'survey';
         }
@@ -183,10 +188,10 @@
                 if (xhr.status !== 200) { offline(); return; }
                 try {
                     var res = JSON.parse(xhr.responseText);
-                    columns = { antre: [], survey: [], muat: [], gate_out: [] };
+                    columns = { antre: [], survey: [], lift_off: [], muat: [], gate_out: [] };
                     res.queues.forEach(function(q) { columns[columnOf(q)].push(q); });
                     // Di dalam depo: yang paling lama di tahapnya tampil paling atas
-                    ['survey', 'muat', 'gate_out'].forEach(function(k) {
+                    ['survey', 'lift_off', 'muat', 'gate_out'].forEach(function(k) {
                         columns[k].sort(function(a, b) { return b.stage_minutes - a.stage_minutes; });
                     });
                     document.getElementById('kWaiting').textContent = res.kpi.waiting;

@@ -76,6 +76,7 @@
             'WAITING_GATE' => 'Menunggu Gate In',
             'IN_YARD'      => 'Menuju Area Survey',
             'IN_SURVEY'    => 'Sedang Survey',
+            'LIFT_OFF'     => 'Menuju Blok (Lift Off)',
             'AT_YARD'      => 'Menuju Gate Out',
             'COMPLETED'    => 'Selesai'
         );
@@ -86,8 +87,8 @@
             $step_names = array('Gate In', 'Muat', 'Gate Out');
             $step_index = array('IN_YARD' => 1, 'AT_YARD' => 2);
         } else {
-            $step_names = array('Gate In', 'Survey', 'Gate Out');
-            $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'AT_YARD' => 2);
+            $step_names = array('Gate In', 'Survey', 'Lift Off', 'Gate Out');
+            $step_index = array('IN_YARD' => 0, 'IN_SURVEY' => 1, 'LIFT_OFF' => 2, 'AT_YARD' => 3);
         }
         $current_step = isset($step_index[$queue->status]) ? $step_index[$queue->status] : -1;
     ?>
@@ -182,7 +183,7 @@
                     <div class="empty-state py-2">
                         <span class="ico" style="background: #fef3c7; color: #d97706;"><i class="fas fa-hourglass-half"></i></span>
                         <div class="fw-bold mb-1">Menunggu Gate In</div>
-                        <div class="small text-secondary">Timer KPI (Gate In &middot; Survey &middot; Gate Out, masing-masing 5 menit) mulai berjalan setelah security scan kitir Anda.</div>
+                        <div class="small text-secondary">Timer KPI per tahap (<?= $is_muat ? 'Gate In &middot; Muat &middot; Gate Out' : 'Gate In &middot; Survey &middot; Lift Off &middot; Gate Out'; ?>) mulai berjalan setelah security scan kitir Anda.</div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -378,7 +379,8 @@
         function SURVEY_POPUPS() { return {
             IN_YARD:   { title: 'Gate In Berhasil!', text: 'Container <?= html_escape($queue->container_no); ?> sudah tercatat masuk depo.', next: 'Selanjutnya: menuju AREA SURVEY dan tunjukkan barcode ke Yardman.' },
             IN_SURVEY: { title: 'Masuk Area Survey', text: 'Container sedang disurvey oleh Yardman.', next: 'Selanjutnya: tunggu survey selesai, Yardman akan scan barcode Anda lagi.' },
-            AT_YARD:   { title: 'Survey Selesai!', text: <?= json_encode(!empty($queue->zone_code) ? 'Lokasi penempatan: ' . $queue->depo . ' - Blok ' . $queue->zone_code . '.' : 'Survey container sudah selesai.', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, next: 'Selanjutnya: menuju GATE OUT dan tunjukkan barcode ke petugas.' },
+            LIFT_OFF:  { title: 'Survey Selesai!', text: <?= json_encode(!empty($queue->zone_code) ? 'Lokasi penempatan: ' . $queue->depo . ' - Blok ' . $queue->zone_code . '.' : 'Survey container sudah selesai.', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, next: 'Selanjutnya: menuju blok untuk LIFT OFF container, lalu tunjukkan barcode ke Yardman.' },
+            AT_YARD:   { title: 'Lift Off Selesai!', text: <?= json_encode('Container ' . $queue->container_no . ' sudah diturunkan' . (!empty($queue->zone_code) ? ' di ' . $queue->depo . ' - Blok ' . $queue->zone_code : '') . '.', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>, next: 'Selanjutnya: menuju GATE OUT dan tunjukkan barcode ke petugas.' },
             COMPLETED: { title: 'Gate Out Berhasil!', text: 'Seluruh proses di depo sudah selesai. Terima kasih.', next: 'Hati-hati di jalan.' }
         }; }
 

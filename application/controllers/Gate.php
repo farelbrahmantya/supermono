@@ -163,7 +163,7 @@ class Gate extends MY_Controller {
             return;
         }
 
-        // JIKA PETUGAS GATE OUT: hanya truk yang sudah selesai survey Yardman (AT_YARD)
+        // JIKA PETUGAS GATE OUT: hanya truk yang sudah selesai di yard (lift off / muat selesai = AT_YARD)
         if ($can_gate_out && $queue->status == 'AT_YARD') {
             $updated = $this->_transition($queue->id, 'AT_YARD', array(
                 'status'      => 'COMPLETED',
@@ -176,13 +176,15 @@ class Gate extends MY_Controller {
             return;
         }
 
-        if ($can_gate_out && in_array($queue->status, array('IN_YARD', 'IN_SURVEY'), TRUE)) {
-            $this->_json(array(
-                'status'  => 'warning',
-                'message' => $this->_is_muat($queue->activity)
-                    ? "Truk {$queue->license_plate} BELUM muat container.\nArahkan truk ke Yardman sebelum Gate Out."
-                    : "Truk {$queue->license_plate} BELUM selesai survey Yardman.\nArahkan truk ke Yardman sebelum Gate Out."
-            ));
+        if ($can_gate_out && in_array($queue->status, array('IN_YARD', 'IN_SURVEY', 'LIFT_OFF'), TRUE)) {
+            if ($this->_is_muat($queue->activity)) {
+                $message = "Truk {$queue->license_plate} BELUM muat container.\nArahkan truk ke Yardman sebelum Gate Out.";
+            } elseif ($queue->status === 'LIFT_OFF') {
+                $message = "Container truk {$queue->license_plate} BELUM di-lift off.\nArahkan truk ke blok penempatan, Yardman scan setelah container diturunkan.";
+            } else {
+                $message = "Truk {$queue->license_plate} BELUM selesai survey Yardman.\nArahkan truk ke Yardman sebelum Gate Out.";
+            }
+            $this->_json(array('status' => 'warning', 'message' => $message));
             return;
         }
 

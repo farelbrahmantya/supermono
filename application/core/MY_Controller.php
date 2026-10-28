@@ -15,8 +15,11 @@ class MY_Controller extends CI_Controller {
     // Toleransi tahap pemilihan container Export (menit)
     const EXPORT_PICK_KPI_MINUTES = 10;
 
+    // Target tahap Lift Off: truk menuju blok & container diturunkan (Repo In / Import)
+    const LIFT_OFF_KPI_MINUTES = 10;
+
     // Status antrean yang sedang berada di dalam depo
-    protected $in_depo_statuses = array('IN_YARD', 'IN_SURVEY', 'AT_YARD');
+    protected $in_depo_statuses = array('IN_YARD', 'IN_SURVEY', 'LIFT_OFF', 'AT_YARD');
 
     // Jenis aktivitas = huruf awal barcode kitir
     protected $activities = array('Z' => 'Repo In', 'A' => 'Import', 'D' => 'Export', 'E' => 'Repo Out');
@@ -38,7 +41,8 @@ class MY_Controller extends CI_Controller {
 
     // Tahap KPI di dalam depo per aktivitas:
     // kunci => [nama tahap, status saat tahap berjalan, kolom mulai, kolom selesai, target menit]
-    protected function _stage_plan($activity) {
+    // $legacy: transaksi Repo In / Import lama (sebelum ada tahap Lift Off) dihitung 3 tahap
+    protected function _stage_plan($activity, $legacy = FALSE) {
         $gate_out = array('Gate Out', 'AT_YARD', 'yard_scan_at', 'gate_out_at', self::STAGE_KPI_MINUTES);
         if ($activity === 'D') {
             return array(
@@ -52,16 +56,31 @@ class MY_Controller extends CI_Controller {
                 'gate_out' => $gate_out
             );
         }
-        return array(
+        $plan = array(
             'gate_in'  => array('Gate In', 'IN_YARD', 'gate_in_at', 'survey_start_at', self::STAGE_KPI_MINUTES),
             'survey'   => array('At Yard (Survey)', 'IN_SURVEY', 'survey_start_at', 'yard_scan_at', self::STAGE_KPI_MINUTES),
-            'gate_out' => $gate_out
+            'lift_off' => array('Lift Off', 'LIFT_OFF', 'yard_scan_at', 'lift_off_at', self::LIFT_OFF_KPI_MINUTES),
+            'gate_out' => array('Gate Out', 'AT_YARD', 'lift_off_at', 'gate_out_at', self::STAGE_KPI_MINUTES)
         );
+        if ($legacy) {
+            unset($plan['lift_off']);
+            $plan['gate_out'] = $gate_out;
+        }
+        return $plan;
+    }
+
+    // Transaksi Repo In / Import yang sudah Gate Out sebelum tahap Lift Off ada (lift_off_at kosong)
+    protected function _is_legacy($row) {
+        $row = (array) $row;
+        return !$this->_is_muat(isset($row['activity']) ? $row['activity'] : 'Z')
+            && empty($row['lift_off_at']) && !empty($row['gate_out_at']);
     }
 
     // Tahap yang sedang berjalan untuk antrean: [kunci, nama, kolom mulai, target menit], NULL jika di luar depo
     protected function _current_stage($queue) {
-        foreach ($this->_stage_plan(isset($queue->activity) ? $queue->activity : 'Z') as $key => $stage) {
+        $legacy = $queue->status === 'AT_YARD' && !$this->_is_muat(isset($queue->activity) ? $queue->activity : 'Z')
+            && property_exists($queue, 'lift_off_at') && empty($queue->lift_off_at);
+        foreach ($this->_stage_plan(isset($queue->activity) ? $queue->activity : 'Z', $legacy) as $key => $stage) {
             if ($stage[1] === $queue->status) {
                 return array($key, $stage[0], $stage[2], $stage[4]);
             }
@@ -144,7 +163,7 @@ class MY_Controller extends CI_Controller {
     // Durasi (menit) setiap tahap yang sudah dilalui, untuk ringkasan & KPI per tahap
     protected function _stage_durations($queue) {
         $result = array();
-        foreach ($this->_stage_plan(isset($queue->activity) ? $queue->activity : 'Z') as $stage) {
+        foreach ($this->_stage_plan(isset($queue->activity) ? $queue->activity : 'Z', $this->_is_legacy($queue)) as $stage) {
             $from = $queue->{$stage[2]};
             $to   = $queue->{$stage[3]};
             if (empty($from) || empty($to)) {
@@ -187,12 +206,13 @@ class MY_Controller extends CI_Controller {
     }
 
     // Daftar antrean yang menunggu diproses pada tahap tertentu (belum di-scan)
-    // WAITING_GATE = menunggu Gate In, IN_YARD = menunggu masuk survey, IN_SURVEY = sedang survey, AT_YARD = menunggu Gate Out
+    // WAITING_GATE = menunggu Gate In, IN_YARD = menunggu masuk survey, IN_SURVEY = sedang survey,
+    // LIFT_OFF = menuju blok & lift off container, AT_YARD = menunggu Gate Out
     protected function _pending_queues($status) {
-        $since_column = array('WAITING_GATE' => 'q.created_at', 'IN_YARD' => 'q.gate_in_at', 'IN_SURVEY' => 'q.survey_start_at', 'AT_YARD' => 'q.yard_scan_at');
+        $since_column = array('WAITING_GATE' => 'q.created_at', 'IN_YARD' => 'q.gate_in_at', 'IN_SURVEY' => 'q.survey_start_at', 'LIFT_OFF' => 'q.yard_scan_at', 'AT_YARD' => 'COALESCE(q.lift_off_at, q.yard_scan_at)');
         $column = $since_column[$status];
 
-        $sql = "SELECT q.queue_number, q.license_plate, q.container_no, q.status, q.activity, z.zone_code, z.depo, TIMESTAMPDIFF(MINUTE, {$column}, ?) AS waiting_minutes
+        $sql = "SELECT q.queue_number, q.license_plate, q.container_no, q.status, q.activity, q.lift_off_at, z.zone_code, z.depo, TIMESTAMPDIFF(MINUTE, {$column}, ?) AS waiting_minutes
                 FROM queue_transactions q
                 LEFT JOIN yard_zones z ON z.id = q.current_zone_id
                 WHERE q.status = ? AND q.is_demo = 0";
@@ -285,7 +305,7 @@ class MY_Controller extends CI_Controller {
     protected function _get_active_queues() {
         $now  = $this->_now();
         $rows = $this->db->query("
-            SELECT q.id, q.queue_number, q.license_plate, q.container_no, q.status, q.activity, q.driver_activity, q.sla_target_minutes, z.zone_code, z.depo,
+            SELECT q.id, q.queue_number, q.license_plate, q.container_no, q.status, q.activity, q.driver_activity, q.sla_target_minutes, q.lift_off_at, z.zone_code, z.depo,
             CASE WHEN q.status = 'WAITING_GATE'
                  THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
                  ELSE TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
@@ -294,14 +314,15 @@ class MY_Controller extends CI_Controller {
                  WHEN 'WAITING_GATE' THEN TIMESTAMPDIFF(MINUTE, q.created_at, ?)
                  WHEN 'IN_YARD'      THEN TIMESTAMPDIFF(MINUTE, q.gate_in_at, ?)
                  WHEN 'IN_SURVEY'    THEN TIMESTAMPDIFF(MINUTE, q.survey_start_at, ?)
-                 ELSE TIMESTAMPDIFF(MINUTE, q.yard_scan_at, ?)
+                 WHEN 'LIFT_OFF'     THEN TIMESTAMPDIFF(MINUTE, q.yard_scan_at, ?)
+                 ELSE TIMESTAMPDIFF(MINUTE, COALESCE(q.lift_off_at, q.yard_scan_at), ?)
             END AS stage_minutes
             FROM queue_transactions q
             LEFT JOIN yard_zones z ON z.id = q.current_zone_id
-            WHERE q.status IN ('IN_YARD', 'IN_SURVEY', 'AT_YARD')
+            WHERE q.status IN ('IN_YARD', 'IN_SURVEY', 'LIFT_OFF', 'AT_YARD')
                OR (q.status = 'WAITING_GATE' AND q.created_at >= ?)
             ORDER BY q.id ASC
-        ", array($now, $now, $now, $now, $now, $now, $this->_expiry_cutoff()))->result();
+        ", array($now, $now, $now, $now, $now, $now, $now, $this->_expiry_cutoff()))->result();
 
         $rate     = $this->_minutes_per_gate_in();
         $position = 0;
@@ -332,8 +353,11 @@ class MY_Controller extends CI_Controller {
             } elseif ($q->status === 'IN_SURVEY') {
                 $label = 'Sedang Survey';
                 $badge = 'badge-yard';
+            } elseif ($q->status === 'LIFT_OFF') {
+                $label = 'Survey Selesai - Lift Off' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
+                $badge = 'badge-yard';
             } else {
-                $label = ($this->_is_muat($q->activity) ? 'Sudah Muat - ' : '') . 'Menunggu Gate Out' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
+                $label = ($this->_is_muat($q->activity) ? 'Sudah Muat - ' : (!empty($q->lift_off_at) ? 'Lift Off Selesai - ' : '')) . 'Menunggu Gate Out' . ($q->zone_code ? ' (' . $q->depo . ' Blok ' . $q->zone_code . ')' : '');
                 $badge = 'badge-yard';
             }
 

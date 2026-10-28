@@ -18,6 +18,8 @@ Kompatibel MySQL 5.1 / phpMyAdmin 3.2.5 (struktur tabel tetap sama dengan versi 
   login dengan user aplikasi utama, plus contoh perintah GRANT SELECT ke `new_general`.
 - `upgrade_07_dampak_demo.sql`: penanda truk simulasi (`is_demo`) dan tabel `lasmono_settings`
   untuk halaman Dampak & Mode Demo. Jalankan sebelum meng-upload file aplikasinya.
+- `upgrade_08_lift_off.sql`: tahap Lift Off untuk Repo In & Import (status `LIFT_OFF`, kolom
+  `lift_off_at` / `lift_off_by`). Alur menjadi Gate In - Survey - Lift Off - Gate Out, target 25 menit.
 - `lasmono_db.sql`: struktur lengkap + data awal untuk instalasi baru (misalnya laptop demo).
 
 Login petugas setelah upgrade: `yardman1`, `admin_ct`, `gate_in`, `gate_out` dengan password

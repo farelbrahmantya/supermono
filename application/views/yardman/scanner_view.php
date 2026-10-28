@@ -69,6 +69,9 @@
         .step-1 { background: #fff3d1; color: #8a5a00; }
         .step-2 { background: #d1fae5; color: #047857; }
         .step-3 { background: #e0ecff; color: #1d4ed8; }
+        .step-4 { background: #ede4ff; color: #6d28d9; }
+        .lift-box { display: flex; align-items: center; gap: 12px; background: #f5f0ff; border: 1px solid #ddd0fb; border-radius: 14px; padding: 12px 14px; }
+        .lift-box i { font-size: 22px; color: #6d28d9; }
         .pick-box { background: #f5f8ff; border: 1px dashed #b9cdf5; border-radius: 14px; padding: 12px; }
         .pick-box input { font-size: 20px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
         .pick-result { font-size: 13px; }
@@ -118,6 +121,9 @@
                 </button>
                 <button type="button" class="stat-chip" id="chipSurvey" data-bs-toggle="offcanvas" data-bs-target="#pendingSheet">
                     <div class="num" id="countSurvey">0</div><small>Sedang survey</small>
+                </button>
+                <button type="button" class="stat-chip" id="chipLift" data-bs-toggle="offcanvas" data-bs-target="#pendingSheet">
+                    <div class="num" id="countLift">0</div><small>Menunggu lift off</small>
                 </button>
             </div>
 
@@ -179,6 +185,7 @@
                     <div><small>Size</small><b id="sheetSize"></b></div>
                     <div style="grid-column: span 2;"><small>Customer</small><b id="sheetCustomer"></b></div>
                 </div>
+                <div id="liftNote" class="lift-box mb-3" style="display:none;"></div>
 
                 <!-- Export: nomor container dipilih customer & Yardman di lapangan, dicek ke database depo -->
                 <div id="containerPicker" class="pick-box mb-3" style="display:none;">
@@ -215,7 +222,9 @@
             <div class="fw-bold small text-secondary mb-1"><i class="fas fa-dolly me-1"></i> MENUNGGU MUAT (EXPORT / REPO OUT)</div>
             <div id="pendingMuatList" class="mb-3"></div>
             <div class="fw-bold small text-secondary mb-1"><i class="fas fa-search me-1"></i> SEDANG SURVEY (BELUM SELESAI)</div>
-            <div id="pendingSurveyList"></div>
+            <div id="pendingSurveyList" class="mb-3"></div>
+            <div class="fw-bold small text-secondary mb-1"><i class="fas fa-arrows-down-to-line me-1"></i> MENUNGGU LIFT OFF DI BLOK</div>
+            <div id="pendingLiftList"></div>
         </div>
     </div>
 
@@ -542,6 +551,7 @@
                 .toggleClass('text-danger fw-bold', q.stage_minutes > target)
                 .toggleClass('text-muted', q.stage_minutes <= target);
             $('#zonePickerTitle').html(res.step === 3 ? 'PILIH DEPO &amp; BLOK PENGAMBILAN CONTAINER' : 'PILIH DEPO &amp; BLOK PENEMPATAN');
+            $('#liftNote').hide();
 
             if (res.step === 3) {
                 // Export / Repo Out: tanpa survey, langsung muat container
@@ -556,6 +566,15 @@
                 $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> SUBMIT MUAT').removeClass('btn-dark btn-primary').addClass('btn-success')
                     .data('action', 'confirm');
                 updateConfirmState();
+            } else if (res.step === 4) {
+                // Repo In / Import: container sudah diturunkan di blok penempatan
+                $('#stepPill').attr('class', 'step-pill step-4').html('<i class="fas fa-arrows-down-to-line"></i> LANGKAH 3 &middot; LIFT OFF');
+                $('#principalNote').hide();
+                $('#zonePicker').hide();
+                $('#liftNote').show().html('<i class="fas fa-location-dot"></i><div><small class="text-muted d-block">Lokasi penempatan</small><b>' +
+                    (q.zone_code ? esc(q.depo) + ' &middot; Blok ' + esc(q.zone_code) : '-') + '</b></div>');
+                $('#btnSheetConfirm').html('<i class="fas fa-check me-1"></i> LIFT OFF SELESAI' + (q.zone_code ? ' &middot; BLOK ' + esc(q.zone_code) : ''))
+                    .removeClass('btn-dark btn-success').addClass('btn-primary').prop('disabled', false).data('action', 'confirm');
             } else if (res.step === 1) {
                 $('#stepPill').attr('class', 'step-pill step-1').html('<i class="fas fa-sign-in-alt"></i> LANGKAH 1 &middot; MASUK SURVEY');
                 $('#zonePicker').hide();
@@ -746,7 +765,7 @@
         function loadPending() {
             $.ajax({ url: "<?= base_url('yardman/pending_json'); ?>", data: { _: Date.now() }, dataType: "json" })
                 .done(function(res) {
-                    let all = res.waiting_survey || [], survey = res.in_survey || [];
+                    let all = res.waiting_survey || [], survey = res.in_survey || [], lift = res.lift_off || [];
                     let isMuat = function(r) { return r.activity === 'D' || r.activity === 'E'; };
                     let waiting = all.filter(function(r) { return !isMuat(r); });
                     let muat = all.filter(isMuat);
@@ -754,6 +773,9 @@
                     $('#countSurvey').text(survey.length);
                     $('#chipWaiting').toggleClass('late', all.some(function(r) { return r.overdue; }));
                     $('#chipSurvey').toggleClass('late', survey.some(function(r) { return r.overdue; }));
+                    $('#countLift').text(lift.length);
+                    $('#chipLift').toggleClass('late', lift.some(function(r) { return r.overdue; }));
+                    renderPendingList(lift, '#pendingLiftList');
                     renderPendingList(waiting, '#pendingWaitingList');
                     renderPendingList(muat, '#pendingMuatList');
                     renderPendingList(survey, '#pendingSurveyList');
