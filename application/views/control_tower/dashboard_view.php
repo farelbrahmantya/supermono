@@ -389,7 +389,7 @@
                             </tr>
                         </thead>
                         <tbody id="sosTableBody">
-                            <?php $sos_labels = array('UNSAFE' => 'KONDISI TIDAK AMAN', 'PUNGLI' => 'PEMUNGUTAN LIAR', 'PENYEROBOTAN' => 'PENYEROBOTAN ANTREAN', 'LAINNYA' => 'LAINNYA'); ?>
+                            <?php $sos_labels = array('UNSAFE' => 'NEAR MISS / UNSAFE', 'PUNGLI' => 'PEMUNGUTAN LIAR', 'PENYEROBOTAN' => 'PENYEROBOTAN ANTREAN', 'LAINNYA' => 'LAINNYA'); ?>
                             <?php foreach($sos_reports as $sos): ?>
                             <tr>
                                 <td><small><?= html_escape($sos->created_at); ?></small></td>
@@ -445,7 +445,7 @@
         }
 
         // Label jenis laporan SOS
-        const SOS_LABELS = { UNSAFE: 'KONDISI TIDAK AMAN', PUNGLI: 'PEMUNGUTAN LIAR', PENYEROBOTAN: 'PENYEROBOTAN ANTREAN', LAINNYA: 'LAINNYA' };
+        const SOS_LABELS = { UNSAFE: 'NEAR MISS / UNSAFE', PUNGLI: 'PEMUNGUTAN LIAR', PENYEROBOTAN: 'PENYEROBOTAN ANTREAN', LAINNYA: 'LAINNYA' };
         function sosLabel(type) { return SOS_LABELS[type] || type; }
         function esc(value) {
             return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();

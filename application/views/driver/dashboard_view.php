@@ -248,10 +248,11 @@
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-secondary">JENIS LAPORAN</label>
                             <select name="report_type" class="form-select fw-semibold" required>
-                                <option value="UNSAFE">Kondisi Tidak Aman (Unsafe Condition)</option>
+                                <option value="UNSAFE">Nyaris Celaka / Kondisi Tidak Aman (Near Miss / Unsafe Condition)</option>
                                 <option value="PUNGLI">Pemungutan Liar</option>
                                 <option value="PENYEROBOTAN">Penyerobotan Antrean</option>
                             </select>
+                            <small class="text-muted d-block mt-1" id="sosTypeHint">Contoh: hampir tertabrak alat berat, container berayun di atas kabin, jalan licin / berlubang.</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label small fw-bold text-secondary">DESKRIPSI KEJADIAN</label>
